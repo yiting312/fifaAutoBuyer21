@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FUT 21 Autobuyer Menu with TamperMonkey
 // @namespace    http://tampermonkey.net/
-// @version      2.1.1
+// @version      2.1.2
 // @updateURL    https://raw.githubusercontent.com/chithakumar13/Fifa21-AutoBuyer/master/autobuyer.js
 // @downloadURL  https://raw.githubusercontent.com/chithakumar13/Fifa21-AutoBuyer/master/autobuyer.js
 // @description  FUT Snipping Tool
@@ -14,6 +14,7 @@
 // @grant       GM_deleteValue
 // @grant       GM_listValues
 // @require     https://raw.githubusercontent.com/discordjs/discord.js/webpack/discord.11.6.4.min.js
+// @license     MIT
 // ==/UserScript==
 
 (function () {
@@ -532,7 +533,7 @@
         view
           .getPlayerNameSearch()
           .addTarget(this, this._ePlayerNameChanged, EventType.CHANGE),
-        (view.__root.style = "width: 50%; float: left;");
+        !isPhone() && (view.__root.style = "width: 50%; float: left;");
     }
   };
 
@@ -599,8 +600,7 @@
             (u.tabBarItem = m),
             (h.tabBarItem = S),
             (st.tabBarItem = ST),
-            (t = [s, o, l, u, st, h]),
-            !isPhone())
+            (t = [s, o, l, u, st, h]))
           ) {
             var C = new UTGameFlowNavigationController(),
               T = new UTGameFlowNavigationController(),
@@ -639,7 +639,7 @@
               (T.tabBarItem = I),
               (v.tabBarItem = P),
               (AB.tabBarItem = AutoBuyerTab), //added line
-              (t = t.concat([C, T, v, AB])); //added line
+              (t = isPhone() ? t.concat([AB]) : t.concat([C, T, v, AB])); //added line
           }
           return (
             i.initWithViewControllers(t),
@@ -858,7 +858,8 @@
         jQuery(view.__root.parentElement).append(
           '<div id="' +
             nameSearchWrapper.substring(1) +
-            '" style="width: 50%; right: 50%;"><textarea readonly id="' +
+            (!isPhone() ? '" style="width: 50%; right: 50%;">"' : '">') +
+            '<textarea readonly id="' +
             nameProgressAutobuyer.substring(1) +
             '" style="font-size: 15px; width: 100%;height: 58%;background-color:#141414;color:#e2dde2;"></textarea><label>Search Results:</label><br/><textarea readonly id="' +
             nameAutoBuyerFoundLog.substring(1) +
@@ -885,13 +886,16 @@
           jQuery(".ut-item-search-view")
             .first()
             .prepend(
-              '<div style="width:100%;display: flex;">' +
+              '<div style="width:100%;display: flex;' +
+                (isPhone() ? 'flex-direction: column;">' : ">") +
                 '<div class="button-container">' +
                 '<select id="' +
                 nameFilterDropdown.substring(1) +
                 '" name="filters" style="width:100%;padding: 10px;font-family: UltimateTeamCondensed,sans-serif;font-size: 1.6em;color: #e2dde2;text-transform: uppercase;background-color: #171826;"></select>' +
                 "</div>" +
-                '<div style="width:50%;margin-top: 1%;" class="button-container">' +
+                '<div style="width:' +
+                (!isPhone() ? "50%" : "100%") +
+                ';margin-top: 1%;" class="button-container">' +
                 '<button style="width:50%" class="btn-standard call-to-action" id="' +
                 nameDeleteFilter.substring(1) +
                 '">Delete Filter</button>' +
@@ -1758,10 +1762,18 @@
     }
   };
 
-  jQuery(document).on("click", nameSearchCancelButton, deactivateAutoBuyer);
-  jQuery(document).on("click", nameClearLogButton, clearLog);
-  jQuery(document).on("click", 'button:contains("Reset")', clearABSettings);
-  jQuery(document).on("click", nameCalcBinPrice, findMinBin);
+  jQuery(document).on(
+    "click touchend",
+    nameSearchCancelButton,
+    deactivateAutoBuyer
+  );
+  jQuery(document).on("click touchend", nameClearLogButton, clearLog);
+  jQuery(document).on(
+    "click touchend",
+    'button:contains("Reset")',
+    clearABSettings
+  );
+  jQuery(document).on("click touchend", nameCalcBinPrice, findMinBin);
 
   jQuery(document).on(
     {
@@ -1772,6 +1784,9 @@
         jQuery(namePreserveChanges).removeClass("hover");
       },
       click: function () {
+        saveDetails();
+      },
+      touchend: function () {
         saveDetails();
       },
     },
@@ -1787,6 +1802,10 @@
         jQuery(nameTestNotification).removeClass("hover");
       },
       click: function () {
+        window.sendNotificationToUser("Test Notification Arrived");
+        window.notify("Test Notification Sent");
+      },
+      touchend: function () {
         window.sendNotificationToUser("Test Notification Arrived");
         window.notify("Test Notification Sent");
       },
@@ -1816,6 +1835,9 @@
       click: function () {
         deleteFilter();
       },
+      touchend: function () {
+        deleteFilter();
+      },
     },
     nameDeleteFilter
   );
@@ -1832,6 +1854,9 @@
   jQuery(document).on(
     {
       click: function () {
+        setFilters();
+      },
+      touchend: function () {
         setFilters();
       },
     },
@@ -1959,22 +1984,34 @@
     }
   };
 
-  jQuery(document).on("click", nameAbBidExact, toggleBidExact);
-  jQuery(document).on("click", nameAbSellToggle, toggleRelist);
+  jQuery(document).on("click touchend", nameAbBidExact, toggleBidExact);
+  jQuery(document).on("click touchend", nameAbSellToggle, toggleRelist);
 
-  jQuery(document).on("click", nameAbRandMinBidToggle, toggleUseRandMinBid);
-  jQuery(document).on("click", nameAbAddBuyDelay, toggleAddDelayAfterBuy);
-  jQuery(document).on("click", nameAbAddFilterGK, toggleAddFilterGK);
-  jQuery(document).on("click", nameAbRandMinBuyToggle, toggleUseRandMinBuy);
-  jQuery(document).on("click", nameAbCloseTabToggle, toggleCloseTab);
-  jQuery(document).on("click", nameAbSoundToggle, toggleSound);
   jQuery(document).on(
-    "click",
+    "click touchend",
+    nameAbRandMinBidToggle,
+    toggleUseRandMinBid
+  );
+  jQuery(document).on(
+    "click touchend",
+    nameAbAddBuyDelay,
+    toggleAddDelayAfterBuy
+  );
+  jQuery(document).on("click touchend", nameAbAddFilterGK, toggleAddFilterGK);
+  jQuery(document).on(
+    "click touchend",
+    nameAbRandMinBuyToggle,
+    toggleUseRandMinBuy
+  );
+  jQuery(document).on("click touchend", nameAbCloseTabToggle, toggleCloseTab);
+  jQuery(document).on("click touchend", nameAbSoundToggle, toggleSound);
+  jQuery(document).on(
+    "click touchend",
     nameAbMessageNotificationToggle,
     toggleMessageNotification
   );
-  jQuery(document).on("click", nameAbSolveCaptcha, toggleSolveCaptcha);
-  jQuery(document).on("click", nameAutoClearLog, toggleAutoLogClear);
+  jQuery(document).on("click touchend", nameAbSolveCaptcha, toggleSolveCaptcha);
+  jQuery(document).on("click touchend", nameAutoClearLog, toggleAutoLogClear);
 
   jQuery(document).on("keyup", nameAbSellPrice, function () {
     jQuery(nameSellAfterTax).html(
