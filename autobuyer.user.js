@@ -1,4 +1,4 @@
-==UserScript==
+// ==UserScript==
 // @name         FUT 21 Autobuyer Menu with TamperMonkey
 // @namespace    http://tampermonkey.net/
 // @version      2.1.0
@@ -45,8 +45,11 @@
     window.botStopped = true;
     window.userWatchItems = [];
     window.eachFilterSearch = null;
-    window.vidaSellPrice = 1900;
-    window.skrtelSellPrice = 1900;
+    window.vidaSellPrice = 1300;
+    window.skrtelSellPrice = 1100;
+    window.vertonSellPrice = 5500;
+    window.continousErrorTimes = 0;
+
 
     var _searchViewModel = null;
 
@@ -337,7 +340,7 @@
     }
 
     window.refreshBidTargetList = function(){
-        writeToDebugLog("refreshBidTargetList");
+        //writeToDebugLog("refreshBidTargetList");
         //clear cache
         services.Item.clearTransferMarketCache();
         //refresh transfer target list and bid with reasonable price
@@ -356,7 +359,10 @@
                 (function (t, playerX) {
                     setTimeout(function () {
                         let player_nameX = window.getItemName(playerX);
-                        writeToDebugLog("unwatch player_name:" + player_nameX + "untargetNumber:" + t);
+                        let auction = playerX._auction;
+                        let isBid = auction.currentBid;
+                        let currentBid = auction.currentBid || auction.startingBid;
+                        writeToDebugLog("unwatch  |  targetList  |  " + currentBid + "  |  " + player_nameX + "  |           |  " + t);
                         unWatchPlayer(playerX);
                     }, 1000 * t);	// 还是每秒执行一次，不是累加的
                 })(untargetNumber, player);
@@ -369,7 +375,7 @@
                         let outBidItems = watchResponse.data.items.filter(function (item) {
                             return item._auction._bidState === "outbid" && item._auction._tradeState === "active";
                         });
-                        writeToDebugLog("requestWatchedItems outBidItems.length:" + outBidItems.length);
+                        writeToDebugLog("WatchList outbid count:  " + outBidItems.length + "  |   active Count:" + watchResponse.data.items.length);
                         var buyNumber = 1;
                         for (var i = 0; i < outBidItems.length; i++) {
                             let player = outBidItems[i];
@@ -384,9 +390,9 @@
                                 (function (t, playerX, checkPriceX, sellPriceX) {
                                     setTimeout(function () {
                                         let player_nameX = window.getItemName(playerX);
-                                        writeToDebugLog("Bidding on outbidded player_name:" + player_nameX + " -> Bidding Price :" + checkPriceX + "buyNumber:" + t);
+                                        writeToDebugLog("bid |  WatchList  |  " + player_nameX + "  |  " + checkPriceX + "  |  " + t);
                                         buyPlayer(playerX, checkPriceX, sellPriceX);
-                                    }, 1000 * t);	// 还是每秒执行一次，不是累加的
+                                    }, 2000 * t);	// 还是每秒执行一次，不是累加的
                                 })(buyNumber, player, checkPrice, sellPrice);
                                 buyNumber++;
                                 /**
@@ -400,11 +406,13 @@
                                 }
                                 **/
                             }else{
-                                writeToDebugLog("skip player:" + player_name + "because currentBid:" + currentBid + "is higher than priceToBid:" + priceToBid);
                                 (function (t, playerX) {
                                     setTimeout(function () {
                                         let player_nameX = window.getItemName(playerX);
-                                        writeToDebugLog("unwatch player_name:" + player_nameX + "untargetNumber:" + t);
+                                        let auction = playerX._auction;
+                                        let isBid = auction.currentBid;
+                                        let currentBid = auction.currentBid || auction.startingBid;
+                                        writeToDebugLog("unwatch  |  targetList  |  " + currentBid  + '\(' + priceToBid + '\)' + "  |  " + player_nameX + "  |           |  " + t);
                                         unWatchPlayer(playerX);
                                     }, 1000 * t);
                                 })(1, player);
@@ -422,21 +430,36 @@
                                 (function (t, playerX, sellPriceX) {
                                     setTimeout(function () {
                                         let player_nameX = window.getItemName(playerX);
-                                        writeToLog("won from targetList  |  list  |  " + player_nameX + "  |  " + sellPriceX + "  |  " + t);
-                                        services.Item.list(playerX, window.getSellBidPrice(sellPriceX), sellPriceX, 3600);
+                                        let auction = playerX._auction;
+                                        let currentBid = auction.currentBid || auction.startingBid;
+                                        //writeToLog("list  |  targetList  |  " + currentBid + "  |  " + player_nameX + "  |  " + sellPriceX + "  |  " + t);
+                                        //services.Item.list(playerX, window.getSellBidPrice(sellPriceX), sellPriceX, 3600);
                                     }, 1000 * t);	// 还是每秒执行一次，不是累加的
                                 })(listNum, player, window.vidaSellPrice);
                             }else if (player_name === "Škrtel         "){
-                                writeToDebugLog("is skrtel");
+                                //writeToDebugLog("is skrtel");
                                 (function (t, playerX, sellPriceX) {
                                     setTimeout(function () {
                                         let player_nameX = window.getItemName(playerX);
-                                        writeToLog("won from targetList  |  list  |  " + player_nameX + "  |  " + sellPriceX + "  |  " + t);
-                                        services.Item.list(playerX, window.getSellBidPrice(sellPriceX), sellPriceX, 3600);
+                                        let auction = playerX._auction;
+                                        let currentBid = auction.currentBid || auction.startingBid;
+                                        //writeToLog("list  |  targetList  |  " + currentBid + "  |  " + player_nameX + "  |  " + sellPriceX + "  |  " + t);
+                                        //services.Item.list(playerX, window.getSellBidPrice(sellPriceX), sellPriceX, 3600);
                                     }, 1000 * t);	// 还是每秒执行一次，不是累加的
                                 })(listNum, player, window.skrtelSellPrice);
-                                //}
+                            }else if (player_name === "Vertonghen     "){
+                                //writeToDebugLog("is verton");
+                                (function (t, playerX, sellPriceX) {
+                                    setTimeout(function () {
+                                        let player_nameX = window.getItemName(playerX);
+                                        let auction = playerX._auction;
+                                        let currentBid = auction.currentBid || auction.startingBid;
+                                        //writeToLog("list  |  targetList  |  " + currentBid + "  |  " + player_nameX + "  |  " + sellPriceX + "  |  " + t);
+                                        //services.Item.list(playerX, window.getSellBidPrice(sellPriceX), sellPriceX, 3600);
+                                    }, 1000 * t);	// 还是每秒执行一次，不是累加的
+                                })(listNum, player, window.vertonSellPrice);
                             }else{
+
                                 //writeToLog("");
                             }
                             listNum++;
@@ -818,7 +841,7 @@
                     let time_txt = '[' + new Date().toLocaleTimeString() + '] ';
                     let log_init_text = 'Autobuyer Ready\n' +
                         time_txt + '------------------------------------------------------------------------------------------\n' +
-                        time_txt + ' Index  | Item name       | price  | op  | result  | comments\n' +
+                        time_txt + 'Action  |  WhichList  |  Current_Bid  |  Player_Name     |  Sell_Price  |  InternalNum\n' +
                         time_txt + '------------------------------------------------------------------------------------------\n';
                     $log.val(log_init_text)
                 }
@@ -1730,7 +1753,7 @@
             let time_txt = '[' + new Date().toLocaleTimeString() + '] ';
             let log_init_text = 'Autobuyer Ready\n' +
                 time_txt + '------------------------------------------------------------------------------------------\n' +
-                time_txt + ' Index  | Item name                 | price  | op  | result  | comments\n' +
+                time_txt + ' action  |  whichList  |  bid_price  |  Item name                 | sell_price  |  result  | comments\n' +
                 time_txt + '------------------------------------------------------------------------------------------\n';
             $log.val(log_init_text)
         }
@@ -1879,7 +1902,7 @@
     window.processor = window.setInterval(function () {
         //cycle flag-autoBuyerActive
         if (window.autoBuyerActive) {
-            writeToDebugLog("processors active");
+            //writeToDebugLog("processors active");
 
             window.stopIfRequired();
 
@@ -1891,7 +1914,7 @@
             if (!window.isSearchInProgress && (window.timers.search.finish == 0 || window.timers.search.finish <= time)) {
                 let searchRequest = 1;
                 while (searchRequest-- > 0) {
-                    window.searchFutMarket(null, null, null);
+                    //window.searchFutMarket(null, null, null);
                 }
                 //window.timers.search = window.createTimeout(time, window.getRandomWait());
                 window.timers.search = window.createTimeout(time, 600000);
@@ -2196,9 +2219,12 @@
                             (function (t, playerX, checkPriceX, sellPriceX) {
                                 setTimeout(function () {
                                     let player_nameX = window.getItemName(playerX);
-                                    writeToDebugLog("Bidding on outbidded player_name:" + player_nameX + " -> Bidding Price :" + checkPriceX + "buyNumber:" + t);
+                                    let auction = playerX._auction;
+                                    let expires = services.Localization.localizeAuctionTimeRemaining(auction.expires);
+                                    let expire_time = window.format_string(expires, 15);
+                                    writeToDebugLog("newbid  |  searchList  |  " + checkPriceX + "  |  " + player_nameX + "  |          |  " + t + "  |  " + expire_time);
                                     buyPlayer(playerX, checkPriceX, sellPriceX);
-                                }, 1000 * t);	// 还是每秒执行一次，不是累加的
+                                }, 2000 * t);	// 还是每秒执行一次，不是累加的
                             })(buyNumber, player, checkPrice, sellPrice);
                             buyNumber++;
                             maxPurchases--;
@@ -2374,6 +2400,7 @@
         createTask();
     }
 
+    //not using
     window.fixRandomPrice = function (price) {
         let range = JSUtils.find(UTCurrencyInputControl.PRICE_TIERS, function (e) {
             return price >= e.min
@@ -2418,7 +2445,7 @@
                             let checkPrice = (window.bidExact) ? bidPrice : ((isBid) ? window.getBuyBidPrice(currentBid) : currentBid);
 
                             if (window.autoBuyerActive && currentBid <= priceToBid && checkPrice <= window.futStatistics.coinsNumber) {
-                                writeToDebugLog('Bidding on outbidded item -> Bidding Price :' + checkPrice);
+                                //writeToDebugLog('Bidding on outbidded item -> Bidding Price :' + checkPrice);
                                 buyPlayer(player, checkPrice, sellPrice);
                                 window.addDelayAfterBuy && window.waitSync(1);
                                 if (!window.bids.includes(auction.tradeId)) {
@@ -2472,7 +2499,7 @@
                 if (isBin && sellPrice !== 0 && !isNaN(sellPrice)) {
                     window.winCount++;
                     let sym = " W:" + window.format_string(window.winCount.toString(), 4);
-                    writeToLog(sym + " | " + player_name + ' | ' + price_txt + ((isBin) ? ' | buy | success | selling for: ' + sellPrice : ' | bid | success |' + ' selling for: ' + sellPrice));
+                    writeToDebugLog(sym + " | " + player_name + ' | ' + price_txt + ((isBin) ? ' | buy | success | selling for: ' + sellPrice : ' | bid | success |' + ' selling for: ' + sellPrice));
                     window.play_audio('card_won');
                     window.sellRequestTimeout = window.setTimeout(function () {
                         services.Item.list(player, window.getSellBidPrice(sellPrice), sellPrice, 3600);
@@ -2480,7 +2507,10 @@
                 } else {
                     window.bidCount++;
                     let sym = " B:" + window.format_string(window.bidCount.toString(), 4);
-                    writeToDebugLog(sym + " | " + player_name + ' | ' + price_txt + ' | bid | success | waiting to expire');
+                    let auction = player._auction;
+                    let expires = services.Localization.localizeAuctionTimeRemaining(auction.expires);
+                    let expire_time = window.format_string(expires, 15);
+                    writeToDebugLog(sym + " | " + player_name + ' | ' + price_txt + ' | bid |' + expire_time + '|  success | waiting to expire');
 
                     /**
                     services.Item.move(player, ItemPile.CLUB).observe(this, (function (sender, moveResponse) {
@@ -2493,11 +2523,21 @@
                 if (jQuery(nameTelegramBuy).val() == 'B' || jQuery(nameTelegramBuy).val() == 'A') {
                     window.sendNotificationToUser("| " + player_name.trim() + ' | ' + price_txt.trim() + ' | buy |');
                 }
-
+                window.continousErrorTimes = 0;
             } else {
+                if (window.continousErrorTimes >=8){
+                    window.deactivateAutoBuyer(true);
+                }else{
+                    window.continousErrorTimes++;
+                }
                 window.lossCount++;
                 let sym = " L:" + window.format_string(window.lossCount.toString(), 4);
-                writeToDebugLog(sym + " | " + player_name + ' | ' + price_txt + ((isBin) ? ' | buy | failure |' : ' | bid | failure |') + ' ERR: ' + data.status + '-' + (errorCodeLookUpShort[data.status] || ''));
+                //writeToDebugLog(sym + " | " + player_name + ' | ' + price_txt + ((isBin) ? ' | buy | failure |' : ' | bid | failure |') + ' ERR: ' + data.status + '-' + (errorCodeLookUpShort[data.status] || ''));
+                let auction = player._auction;
+                let expires = services.Localization.localizeAuctionTimeRemaining(auction.expires);
+                let expire_time = window.format_string(expires, 15);
+                writeToDebugLog(sym + " | " + player_name + ' | ' + price_txt + ' | bid |  ' + expire_time + '  |  failure |' + ' ERR: ' + data.status + '-' + (errorCodeLookUpShort[data.status] || ''));
+
                 if (jQuery(nameTelegramBuy).val() == 'L' || jQuery(nameTelegramBuy).val() == 'A') {
                     window.sendNotificationToUser("| " + player_name.trim() + ' | ' + price_txt.trim() + ' | failure |');
                 }
@@ -2595,12 +2635,17 @@
             }
             **/
             if (window.futStatistics.unsoldItems){
-                writeToDebugLog("updateTransferList unsoldItemsLocal.length:" + unsoldItemsLocal.length);
                 var listNum = 1;
                 var otherUnsold = false;
-                writeToLog('------------------------------------------------------------------------------------------');
-                writeToLog('[TRANSFER-LIST] > ' + unsoldItemsLocal.length + " item(s) unsold");
-                writeToLog('------------------------------------------------------------------------------------------');
+                writeToDebugLog('------------------------------------------------------------------------------------------');
+                writeToDebugLog('[TRANSFER-LIST] > ' + unsoldItemsLocal.length + " item(s) unsold");
+                writeToDebugLog('------------------------------------------------------------------------------------------');
+                var unsoldItemsLengthLimit = 5;
+                if (unsoldItemsLengthLimit <= unsoldItemsLocal.length){
+                    unsoldItemsLengthLimit = 5;
+                }else{
+                    unsoldItemsLengthLimit = unsoldItemsLocal.length;
+                }
                 for (var wi = 0; wi < unsoldItemsLocal.length; wi++) {
                     let player = unsoldItemsLocal[wi];
                     let player_name = window.getItemName(player);
@@ -2620,7 +2665,14 @@
                                 services.Item.list(playerX, window.getSellBidPrice(sellPriceX), sellPriceX, 3600);
                             }, 1000 * t);	// 还是每秒执行一次，不是累加的
                         })(listNum, player, window.skrtelSellPrice);
-                        //}
+                    }else if (player_name === "Vertonghen     "){
+                        (function (t, playerX, sellPriceX) {
+                            setTimeout(function () {
+                                let player_nameX = window.getItemName(playerX);
+                                writeToDebugLog("relist  |  " + player_nameX + "  |  " + sellPriceX + "  |  " + t);
+                                services.Item.list(playerX, window.getSellBidPrice(sellPriceX), sellPriceX, 3600);
+                            }, 1000 * t);	// 还是每秒执行一次，不是累加的
+                        })(listNum, player, window.vertonSellPrice);
                     }else{
                         writeToDebugLog("has other unsold player");
                         otherUnsold = true;
@@ -2656,9 +2708,9 @@
             }
             minSoldCount = 0;//clear soldItems anyway
             if (window.futStatistics.soldItems > minSoldCount) {
-                writeToLog('------------------------------------------------------------------------------------------');
-                writeToLog('[TRANSFER-LIST] > ' + window.futStatistics.soldItems + " item(s) sold");
-                writeToLog('------------------------------------------------------------------------------------------');
+                writeToDebugLog('------------------------------------------------------------------------------------------');
+                writeToDebugLog('[TRANSFER-LIST] > ' + window.futStatistics.soldItems + " item(s) sold");
+                writeToDebugLog('------------------------------------------------------------------------------------------');
                 window.clearSoldItems(clearSoldItems);
             }
             sendPinEvents("Hub - Transfers");
@@ -2712,4 +2764,3 @@
         });
     }
 })();
-
