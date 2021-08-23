@@ -45,10 +45,12 @@
     window.botStopped = true;
     window.userWatchItems = [];
     window.eachFilterSearch = null;
-    window.vidaSellPrice = 1300;
-    window.skrtelSellPrice = 1100;
-    window.vertonSellPrice = 5500;
     window.continousErrorTimes = 0;
+    window.playerNameList = ["Vida           ","Škrtel         ","Maguire        "];//watch list bid players(WATCHOUT the BLANK!!!!)
+    window.playerSellPriceList = [1900,1900,5000];//players' sell price
+    window.playerBidPriceList = [600,600,4000];//players' max bid price
+
+
 
 
     var _searchViewModel = null;
@@ -339,6 +341,16 @@
 
     }
 
+    window.listPlayerFromWatchList = function(t, playerX, sellPriceX){
+        setTimeout(function () {
+            let player_nameX = window.getItemName(playerX);
+            let auction = playerX._auction;
+            let currentBid = auction.currentBid || auction.startingBid;
+            writeToLog("list  |  targetList  |  " + currentBid + "  |  " + player_nameX + "  |  " + sellPriceX + "  |  " + t);
+            services.Item.list(playerX, window.getSellBidPrice(sellPriceX), sellPriceX, 3600);
+        }, 1000 * t);
+    }
+
     window.refreshBidTargetList = function(){
         //writeToDebugLog("refreshBidTargetList");
         //clear cache
@@ -350,6 +362,10 @@
             let activeItems = response.data.items.filter(function (item) {
                 return item._auction && item._auction._tradeState === "active";
             });
+            if (activeItems.length === 0){//if activebid is 0 then buy new items
+                var time = (new Date()).getTime();
+                window.timers.search = window.createTimeout(time, 500);
+            }
             let closedOutbidItems = response.data.items.filter(function (item) {
                 return item._auction && item._auction._bidState === "outbid" && item._auction._tradeState === "closed";
             });
@@ -362,7 +378,7 @@
                         let auction = playerX._auction;
                         let isBid = auction.currentBid;
                         let currentBid = auction.currentBid || auction.startingBid;
-                        writeToDebugLog("unwatch  |  targetList  |  " + currentBid + "  |  " + player_nameX + "  |           |  " + t);
+                        writeToLog("unwatch  |  targetList  |  " + currentBid + "（closed）  |  " + player_nameX + "  |           |  " + t);
                         unWatchPlayer(playerX);
                     }, 1000 * t);	// 还是每秒执行一次，不是累加的
                 })(untargetNumber, player);
@@ -381,20 +397,37 @@
                             let player = outBidItems[i];
                             let player_name = window.getItemName(player);
                             let auction = player._auction;
+                            //if undefined player is unbided
                             let isBid = auction.currentBid;
+                            //item current bid
                             let currentBid = auction.currentBid || auction.startingBid;
-                            let priceToBid = (window.bidExact) ? bidPrice : ((isBid) ? window.getSellBidPrice(bidPrice) : bidPrice);
+                            //max bid price
+                            let priceToBid = (isBid) ? window.getSellBidPrice(bidPrice) : bidPrice;
+                            //if player's max bid price is defined in code bid in that money
+                            var playerIndex = window.playerNameList.indexOf(player_name);
+                            if (playerIndex > -1){
+                                var playerBidPrice = window.playerBidPriceList[playerIndex];
+                                priceToBid = (isBid) ? window.getSellBidPrice(playerBidPrice) : playerBidPrice;
+                            }
+                            //this is the bid money
                             let checkPrice = (window.bidExact) ? bidPrice : ((isBid) ? window.getBuyBidPrice(currentBid) : currentBid);
                             //if (window.autoBuyerActive && currentBid <= priceToBid && checkPrice <= window.futStatistics.coinsNumber) {
-                            if (currentBid <= priceToBid) {
-                                (function (t, playerX, checkPriceX, sellPriceX) {
-                                    setTimeout(function () {
-                                        let player_nameX = window.getItemName(playerX);
-                                        writeToDebugLog("bid |  WatchList  |  " + player_nameX + "  |  " + checkPriceX + "  |  " + t);
-                                        buyPlayer(playerX, checkPriceX, sellPriceX);
-                                    }, 2000 * t);	// 还是每秒执行一次，不是累加的
-                                })(buyNumber, player, checkPrice, sellPrice);
-                                buyNumber++;
+                            if (window.autoBuyerActive && (currentBid <= priceToBid)) {
+                                if (auction.expires > 30) {
+                                    let expires = services.Localization.localizeAuctionTimeRemaining(auction.expires);
+                                    let expire_time = window.format_string(expires, 15);
+                                    let player_name = window.getItemName(player);
+                                    writeToDebugLog("skipRebid  | " + player_name + ' | ' + currentBid + ' | ' + expire_time + '|  ');
+                                }else{
+                                    (function (t, playerX, checkPriceX, sellPriceX) {
+                                        setTimeout(function () {
+                                            let player_nameX = window.getItemName(playerX);
+                                            writeToDebugLog("bid |  WatchList  |  " + player_nameX + "  |  " + checkPriceX + "  |  " + t);
+                                            buyPlayer(playerX, checkPriceX, sellPriceX);
+                                        }, 2000 * t);	// 还是每秒执行一次，不是累加的
+                                    })(buyNumber, player, checkPrice, sellPrice);
+                                    buyNumber++;
+                                }
                                 /**
                                 window.addDelayAfterBuy && window.waitSync(1);
                                 if (!window.bids.includes(auction.tradeId)) {
@@ -412,7 +445,7 @@
                                         let auction = playerX._auction;
                                         let isBid = auction.currentBid;
                                         let currentBid = auction.currentBid || auction.startingBid;
-                                        writeToDebugLog("unwatch  |  targetList  |  " + currentBid  + '\(' + priceToBid + '\)' + "  |  " + player_nameX + "  |           |  " + t);
+                                        writeToLog("unwatch  |  targetList  |  " + currentBid  + '\(' + priceToBid + '\)' + "  |  " + player_nameX + "  |           |  " + t);
                                         unWatchPlayer(playerX);
                                     }, 1000 * t);
                                 })(1, player);
@@ -426,43 +459,12 @@
                         for (var wi = 0; wi < wonItems.length; wi++) {
                             let player = wonItems[wi];
                             let player_name = window.getItemName(player);
-                            if (player_name === "Vida           "){
-                                (function (t, playerX, sellPriceX) {
-                                    setTimeout(function () {
-                                        let player_nameX = window.getItemName(playerX);
-                                        let auction = playerX._auction;
-                                        let currentBid = auction.currentBid || auction.startingBid;
-                                        //writeToLog("list  |  targetList  |  " + currentBid + "  |  " + player_nameX + "  |  " + sellPriceX + "  |  " + t);
-                                        //services.Item.list(playerX, window.getSellBidPrice(sellPriceX), sellPriceX, 3600);
-                                    }, 1000 * t);	// 还是每秒执行一次，不是累加的
-                                })(listNum, player, window.vidaSellPrice);
-                            }else if (player_name === "Škrtel         "){
-                                //writeToDebugLog("is skrtel");
-                                (function (t, playerX, sellPriceX) {
-                                    setTimeout(function () {
-                                        let player_nameX = window.getItemName(playerX);
-                                        let auction = playerX._auction;
-                                        let currentBid = auction.currentBid || auction.startingBid;
-                                        //writeToLog("list  |  targetList  |  " + currentBid + "  |  " + player_nameX + "  |  " + sellPriceX + "  |  " + t);
-                                        //services.Item.list(playerX, window.getSellBidPrice(sellPriceX), sellPriceX, 3600);
-                                    }, 1000 * t);	// 还是每秒执行一次，不是累加的
-                                })(listNum, player, window.skrtelSellPrice);
-                            }else if (player_name === "Vertonghen     "){
-                                //writeToDebugLog("is verton");
-                                (function (t, playerX, sellPriceX) {
-                                    setTimeout(function () {
-                                        let player_nameX = window.getItemName(playerX);
-                                        let auction = playerX._auction;
-                                        let currentBid = auction.currentBid || auction.startingBid;
-                                        //writeToLog("list  |  targetList  |  " + currentBid + "  |  " + player_nameX + "  |  " + sellPriceX + "  |  " + t);
-                                        //services.Item.list(playerX, window.getSellBidPrice(sellPriceX), sellPriceX, 3600);
-                                    }, 1000 * t);	// 还是每秒执行一次，不是累加的
-                                })(listNum, player, window.vertonSellPrice);
-                            }else{
-
-                                //writeToLog("");
+                            var playerIndex = window.playerNameList.indexOf(player_name);
+                            if (playerIndex > -1){
+                                var playerSellPrice = window.playerSellPriceList[playerIndex];
+                                window.listPlayerFromWatchList(listNum, player, playerSellPrice);
+                                listNum++;
                             }
-                            listNum++;
                         }
                     }
                 });
@@ -1914,7 +1916,7 @@
             if (!window.isSearchInProgress && (window.timers.search.finish == 0 || window.timers.search.finish <= time)) {
                 let searchRequest = 1;
                 while (searchRequest-- > 0) {
-                    //window.searchFutMarket(null, null, null);
+                    window.searchFutMarket(null, null, null);
                 }
                 //window.timers.search = window.createTimeout(time, window.getRandomWait());
                 window.timers.search = window.createTimeout(time, 600000);
@@ -2446,15 +2448,23 @@
 
                             if (window.autoBuyerActive && currentBid <= priceToBid && checkPrice <= window.futStatistics.coinsNumber) {
                                 //writeToDebugLog('Bidding on outbidded item -> Bidding Price :' + checkPrice);
-                                buyPlayer(player, checkPrice, sellPrice);
-                                window.addDelayAfterBuy && window.waitSync(1);
-                                if (!window.bids.includes(auction.tradeId)) {
-                                    window.bids.push(auction.tradeId);
+                                if (auction.expires > 1800) {
+                                    let expires = services.Localization.localizeAuctionTimeRemaining(auction.expires);
+                                    let expire_time = window.format_string(expires, 15);
+                                    let player_name = window.getItemName(player);
+                                    writeToDebugLog("skipRebid  | " + player_name + ' | ' + currentBid + ' | ' + expire_time + '|  ');
+                                }else{
+                                    buyPlayer(player, checkPrice, sellPrice);
+                                    window.addDelayAfterBuy && window.waitSync(1);
+                                    if (!window.bids.includes(auction.tradeId)) {
+                                        window.bids.push(auction.tradeId);
 
-                                    if (window.bids.length > 300) {
-                                        window.bids.shift();
+                                        if (window.bids.length > 300) {
+                                            window.bids.shift();
+                                        }
                                     }
                                 }
+
                             }
                         }
                     }
@@ -2524,11 +2534,14 @@
                     window.sendNotificationToUser("| " + player_name.trim() + ' | ' + price_txt.trim() + ' | buy |');
                 }
                 window.continousErrorTimes = 0;
+                //writeToLog("window.continousErrorTimes:" + window.continousErrorTimes);
             } else {
-                if (window.continousErrorTimes >=8){
+                if (window.continousErrorTimes >=3){
+                    writeToLog("end window.continousErrorTimes:" + window.continousErrorTimes);
                     window.deactivateAutoBuyer(true);
                 }else{
                     window.continousErrorTimes++;
+                    writeToLog("window.continousErrorTimes:" + window.continousErrorTimes);
                 }
                 window.lossCount++;
                 let sym = " L:" + window.format_string(window.lossCount.toString(), 4);
@@ -2597,6 +2610,14 @@
         return bin + 1000;
     };
 
+    window.relistExpiredPlayers = function(t, playerX, sellPriceX){
+        setTimeout(function () {
+            let player_nameX = window.getItemName(playerX);
+            writeToDebugLog("relist  |  " + player_nameX + "  |  " + sellPriceX + "  |  " + t);
+            services.Item.list(playerX, window.getSellBidPrice(sellPriceX), sellPriceX, 3600);
+        }, 2000 * t);	// 还是每秒执行一次，不是累加的
+    }
+
     //update transferList
     window.updateTransferList = function () {
         writeToDebugLog("updateTransferList");
@@ -2649,39 +2670,20 @@
                 for (var wi = 0; wi < unsoldItemsLocal.length; wi++) {
                     let player = unsoldItemsLocal[wi];
                     let player_name = window.getItemName(player);
-                    if (player_name === "Vida           "){
-                        (function (t, playerX, sellPriceX) {
-                            setTimeout(function () {
-                                let player_nameX = window.getItemName(playerX);
-                                writeToDebugLog("relist  |  " + player_nameX + "  |  " + sellPriceX + "  |  " + t);
-                                services.Item.list(playerX, window.getSellBidPrice(sellPriceX), sellPriceX, 3600);
-                            }, 1000 * t);	// 还是每秒执行一次，不是累加的
-                        })(listNum, player, window.vidaSellPrice);
-                    }else if (player_name === "Škrtel         "){
-                        (function (t, playerX, sellPriceX) {
-                            setTimeout(function () {
-                                let player_nameX = window.getItemName(playerX);
-                                writeToDebugLog("relist  |  " + player_nameX + "  |  " + sellPriceX + "  |  " + t);
-                                services.Item.list(playerX, window.getSellBidPrice(sellPriceX), sellPriceX, 3600);
-                            }, 1000 * t);	// 还是每秒执行一次，不是累加的
-                        })(listNum, player, window.skrtelSellPrice);
-                    }else if (player_name === "Vertonghen     "){
-                        (function (t, playerX, sellPriceX) {
-                            setTimeout(function () {
-                                let player_nameX = window.getItemName(playerX);
-                                writeToDebugLog("relist  |  " + player_nameX + "  |  " + sellPriceX + "  |  " + t);
-                                services.Item.list(playerX, window.getSellBidPrice(sellPriceX), sellPriceX, 3600);
-                            }, 1000 * t);	// 还是每秒执行一次，不是累加的
-                        })(listNum, player, window.vertonSellPrice);
-                    }else{
-                        writeToDebugLog("has other unsold player");
-                        otherUnsold = true;
+                    //relist expired players
+                    /**
+                    var playerIndex = window.playerNameList.indexOf(player_name);
+                    if (playerIndex > -1){
+                        var playerSellPrice = window.playerSellPriceList[playerIndex];
+                        window.relistExpiredPlayers(listNum, player, playerSellPrice);
+                        listNum++;
                     }
-                    listNum++;
+                    **/
                 }
                 if (otherUnsold){
                     //services.Item.relistExpiredAuctions().observe(this, function (t, response) {});
                 }
+                services.Item.relistExpiredAuctions().observe(this, function (t, response) {});
             }
 
             window.futStatistics.activeTransfers = response.data.items.filter(function (item) {
