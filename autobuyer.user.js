@@ -46,15 +46,66 @@
     window.userWatchItems = [];
     window.eachFilterSearch = null;
     window.continousErrorTimes = 0;
-    window.playerNameList = ["Vida           ","Škrtel         ","Maguire        "];//watch list bid players(WATCHOUT the BLANK!!!!)
-    window.playerSellPriceList = [1900,1900,5000];//players' sell price
-    window.playerBidPriceList = [600,600,4000];//players' max bid price
-
+    window.maxNewBidNumber = 3;
+    window.maxRelistNumber = 0;
+    window.bidPlayerMap = {};
 
 
 
     var _searchViewModel = null;
 
+    window.testFunction = function(){
+        writeToDebugLog("test function");
+
+        var playerName = "testPlayer";
+        var bidPrice = 100;
+        var sellPrice = 200;
+        let singlePlayerList = {"player_name": playerName,"bidPrice": bidPrice,"sellPrice": sellPrice};
+        window.addBidPlayerInMap(singlePlayerList);
+        /**
+        var bidPlayerMap = {playerName:singlePlayerList};
+        writeToDebugLog(bidPlayerMap);
+        writeToDebugLog(bidPlayerMap.playerName.player_name);
+        **/
+
+        var player = _searchViewModel.playerData;
+        var playerString = JSON.stringify(player);
+        writeToDebugLog("playerString:" + playerString);
+
+
+    }
+
+
+
+    window.addBidPlayerInMap = function(singlePlayer){
+        writeToDebugLog("addBidPlayerInMap");
+        let singlePlayerString = JSON.stringify(singlePlayer);
+        writeToDebugLog("singlePlayerString:" + singlePlayerString);
+
+        //playerBidMap
+        window.getBidPlayerInMap();
+        window.bidPlayerMap[singlePlayer.player_name] = singlePlayer;
+        let bidPlayerMapString = JSON.stringify(window.bidPlayerMap);
+        writeToDebugLog("bidPlayerMapString:" + bidPlayerMapString);
+
+        GM_setValue("playerBidMap", JSON.stringify(window.bidPlayerMap));
+    }
+
+    window.deleteBidPlayerInMap = function(playerName){
+        //playerBidMap
+        window.getBidPlayerInMap();
+        delete window.bidPlayerMap[playerName];
+        GM_setValue("playerBidMap", JSON.stringify(window.bidPlayerMap));
+    }
+
+    window.getBidPlayerInMap = function(){
+        var tempJsonString = GM_getValue("playerBidMap");
+        writeToDebugLog("tempJsonString:" + tempJsonString);
+        if (!tempJsonString) {
+            return;
+        }
+        window.bidPlayerMap = JSON.parse(tempJsonString);
+    }
 
     // DIV names
     function makeid(length) {
@@ -125,7 +176,14 @@
         nameProxyPort = '#elem_' + makeid(15),
         nameProxyLogin = '#elem_' + makeid(15),
         nameAntiCaptchKey = '#elem_' + makeid(15),
-        nameProxyPassword = '#elem_' + makeid(15);
+        nameProxyPassword = '#elem_' + makeid(15),
+        nameSelectedBidPlayerFilter = '#elem_' + makeid(15),
+        nameSelectedBidPlayerFilterAddButton = '#elem_' + makeid(15),
+        nameSelectedBidPlayerFilterRemoveButton = '#elem_' + makeid(15),
+        nameSelectedBidPlayerFilterBidPriceInput = '#elem_' + makeid(15),
+        nameSelectedBidPlayerFilterSellPriceInput = '#elem_' + makeid(15),
+        nameBidPlayerNameInput = '#elem_' + makeid(15),
+        nameTestBidPlayerNameButton = '#elem_' + makeid(15);
 
     window.loadFilter = function () {
         var filterName = $('select[name=filters] option').filter(':selected').val();
@@ -352,13 +410,14 @@
     }
 
     window.refreshBidTargetList = function(){
-        //writeToDebugLog("refreshBidTargetList");
+        writeToDebugLog("refreshBidTargetList");
         //clear cache
         services.Item.clearTransferMarketCache();
         //refresh transfer target list and bid with reasonable price
         services.Item.requestWatchedItems().observe(this, function (t, response) {
             var bidPrice = parseInt(jQuery(nameAbMaxBid).val());
             var sellPrice = parseInt(jQuery(nameAbSellPrice).val());
+            window.maxNewBidNumber = 50 - response.data.items.length;
             let activeItems = response.data.items.filter(function (item) {
                 return item._auction && item._auction._tradeState === "active";
             });
@@ -404,9 +463,9 @@
                             //max bid price
                             let priceToBid = (isBid) ? window.getSellBidPrice(bidPrice) : bidPrice;
                             //if player's max bid price is defined in code bid in that money
-                            var playerIndex = window.playerNameList.indexOf(player_name);
-                            if (playerIndex > -1){
-                                var playerBidPrice = window.playerBidPriceList[playerIndex];
+                            let playerJSON = window.bidPlayerMap[player_name];
+                            if(playerJSON){
+                                var playerBidPrice = playerJSON.bidPrice;
                                 priceToBid = (isBid) ? window.getSellBidPrice(playerBidPrice) : playerBidPrice;
                             }
                             //this is the bid money
@@ -456,15 +515,25 @@
                             return item._auction._bidState === "highest" && item._auction._tradeState === "closed";
                         });
                         var listNum = 1;
+                        var maxReLiNum = window.maxRelistNumber;
                         for (var wi = 0; wi < wonItems.length; wi++) {
+                            if (maxReLiNum < 1){
+                                writeToDebugLog("skip relist because transfer list if full");
+                                return;
+                            }
                             let player = wonItems[wi];
                             let player_name = window.getItemName(player);
-                            var playerIndex = window.playerNameList.indexOf(player_name);
-                            if (playerIndex > -1){
-                                var playerSellPrice = window.playerSellPriceList[playerIndex];
+
+                            let playerJSON = window.bidPlayerMap[player_name];
+                            if(playerJSON){
+                                var playerSellPrice = playerJSON.sellPrice;
                                 window.listPlayerFromWatchList(listNum, player, playerSellPrice);
                                 listNum++;
+                                maxReLiNum--;
                             }
+
+
+
                         }
                     }
                 });
@@ -515,6 +584,7 @@
     };
 
     window.deactivateAutoBuyer = function (isStopped) {
+        window.sendNotificationToUser("LuisTheBuyerStop deactivateAutoBuyer");
         if (window.botStopped && !window.autoBuyerActive) {
             return;
         }
@@ -549,11 +619,27 @@
     };
 
     window.clearLog = function () {
+        //window.testFunction();
+        //return;
         var $progressLog = jQuery(nameProgressAutobuyer);
         var $buyerLog = jQuery(nameAutoBuyerFoundLog);
         $progressLog.val("");
         $buyerLog.val("");
+        window.findOutMaxNewBidAndMaxRelist();
+
     };
+
+    window.findOutMaxNewBidAndMaxRelist = function(){
+        services.Item.requestTransferItems().observe(this, function (t, response) {
+            window.maxRelistNumber = 100 - response.data.items.length;
+            services.Item.requestWatchedItems().observe(this, function (tW, responseW) {
+                window.maxNewBidNumber = 50 - responseW.data.items.length;
+                writeToLog("window.maxRelistNumber:" + window.maxRelistNumber + "   window.maxNewBidNumber:" + window.maxNewBidNumber);
+            });
+        });
+    }
+
+
 
     JSUtils.inherits(UTAutoBuyerViewController, UTMarketSearchFiltersViewController);
 
@@ -863,6 +949,8 @@
                         '<button style="width:100%" class="btn-standard call-to-action" id="' + namePreserveChanges.substring(1) + '">Save Filter</button>' +
                         '</div> </div>');
                     jQuery('.search-prices').first().append(
+                        '<div><br></div>' +
+                        '<div><br></div>' +
                         '<div><br></div>' +
                         '<hr>' +
                         '<div class="search-price-header">' +
@@ -1294,26 +1382,98 @@
                         '  <source src="https://proxy.notificationsounds.com/wake-up-tones/alarm-frenzy-493/download/file-sounds-897-alarm-frenzy.ogg" type="audio/ogg">\n' +
                         '  <source src="https://proxy.notificationsounds.com/wake-up-tones/alarm-frenzy-493/download/file-sounds-897-alarm-frenzy.mp3" type="audio/mpeg">\n' +
                         '  Your browser does not support the audio element.\n' +
-                        '</audio>'
+                        '</audio>' +
+                        '<div><br></div>' +
+                        '<div class="search-price-header">' +
+                        '   <h1 class="secondary">Rebid Settings:</h1>' +
+                        '</div>' +
+                        '<div class="button-container">' +
+                        '       <select multiple="multiple" class="multiselect-filter" id="' + nameSelectedBidPlayerFilter.substring(1) + '" name="selectedFiltersBidPlayer" style="padding: 10px;width: 100%;font-family: UltimateTeamCondensed,sans-serif;font-size: 1.6em;color: #e2dde2;text-transform: uppercase;background-color: #171826; overflow-y : scroll"></select>' +
+                        '</div>' +
+                        '<div class="price-filter">' +
+                        '   <div class="info">' +
+                        '       <span class="secondary label">Bid Player Name</span>' +
+                        '   </div>' +
+                        '   <div class="buttonInfo">' +
+                        '       <div class="inputBox">' +
+                        '           <input type="text" class="numericInput" id="' + nameBidPlayerNameInput.substring(1) + '" style="text-transform: none;">' +
+                        '       </div>' +
+                        '   </div>' +
+                        '</div>'+
+                        '<div class="price-filter">' +
+                        '   <div class="info">' +
+                        '       <span class="secondary label">Bid Price</span>' +
+                        '   </div>' +
+                        '   <div class="buttonInfo">' +
+                        '       <div class="inputBox">' +
+                        '           <input type="text" class="numericInput" id="' + nameSelectedBidPlayerFilterBidPriceInput.substring(1) + '" style="text-transform: none;">' +
+                        '       </div>' +
+                        '   </div>' +
+                        '</div>' +
+                        '<div class="price-filter">' +
+                        '   <div class="info">' +
+                        '       <span class="secondary label">Sell Price</span>' +
+                        '   </div>' +
+                        '   <div class="buttonInfo">' +
+                        '       <div class="inputBox">' +
+                        '           <input type="text" class="numericInput" id="' + nameSelectedBidPlayerFilterSellPriceInput.substring(1) + '" style="text-transform: none;">' +
+                        '       </div>' +
+                        '   </div>' +
+                        '</div>' +
+                        '<div class="price-filter">' +
+                        '   <div class="info">' +
+                        '       <span class="secondary label">  </span>' +
+                        '   </div>' +
+                        '   <div class="buttonInfo">' +
+                        '       <div class="inputBox">' +
+                        '           <button class="btn-standard call-to-action" id="' + nameTestBidPlayerNameButton.substring(1) + '">Test Player Name</button>' +
+                        '       </div>' +
+                        '   </div>' +
+                        '</div>' +
+                        '<div class="button-container">' +
+                        '    <button class="btn-standard call-to-action" id="' + nameSelectedBidPlayerFilterAddButton.substring(1) + '">Add Bid Player</button>' +
+                        '</div>' +
+                        '<div class="button-container">' +
+                        '    <button class="btn-standard call-to-action" id="' + nameSelectedBidPlayerFilterRemoveButton.substring(1) + '">Remove Bid Player</button>' +
+                        '</div>'
                     );
+
+
 
 
                     let dropdown = $(nameFilterDropdown);
                     let filterdropdown = $(nameSelectedFilter);
 
+                    let bidPlayerSelector = $(nameSelectedBidPlayerFilter);
+
+
+
                     dropdown.empty();
                     filterdropdown.empty();
+                    bidPlayerSelector.empty();
 
                     dropdown.append('<option selected="true" disabled>Choose filter to load</option>');
                     dropdown.prop('selectedIndex', 0);
+
+
 
                     var filterArray = GM_listValues();
                     //console.log(filterArray);
 
                     // Populate dropdown with list of filters
                     for (var i = 0; i < filterArray.length; i++) {
-                        dropdown.append($('<option></option>').attr('value', filterArray[i]).text(filterArray[i]));
-                        filterdropdown.append($('<option></option>').attr('value', filterArray[i]).text(filterArray[i]));
+                        if (filterArray[i] === "playerBidMap"){
+
+                        }else{
+                            dropdown.append($('<option></option>').attr('value', filterArray[i]).text(filterArray[i]));
+                            filterdropdown.append($('<option></option>').attr('value', filterArray[i]).text(filterArray[i]));
+                        }
+
+                    }
+
+                    window.getBidPlayerInMap();
+                    for(var item in window.bidPlayerMap){
+                        bidPlayerSelector.append($('<option></option>').attr('value', item).text(item));
                     }
                 }
             }
@@ -1599,13 +1759,13 @@
             jQuery(nameDeleteFilter).removeClass("hover");
         },
         click: function () {
-            deleteFilter()
+            deleteFilter();
         }
     }, nameDeleteFilter);
 
     jQuery(document).on({
         change: function () {
-            loadFilter()
+            loadFilter();
         }
     }, nameFilterDropdown);
 
@@ -1614,6 +1774,86 @@
             setFilters();
         },
     }, nameSelectedFilter);
+
+    jQuery(document).on({
+        click: function () {
+            selectBidPlayer();
+        },
+    }, nameSelectedBidPlayerFilter);
+
+    window.selectBidPlayer = function(){
+        var selectedPlayerName = $('select[name=selectedFiltersBidPlayer] option').filter(':selected').val();
+        var player = window.bidPlayerMap[selectedPlayerName];
+        //show the name in the field
+        //set name
+        $(nameBidPlayerNameInput).val(player.player_name);
+        //set bid price
+        $(nameSelectedBidPlayerFilterBidPriceInput).val(player.bidPrice);
+        //set sell price
+        $(nameSelectedBidPlayerFilterSellPriceInput).val(player.sellPrice);
+    }
+
+
+
+    jQuery(document).on({
+        click: function () {
+            testBidPlayerName();
+        },
+    }, nameTestBidPlayerNameButton);
+
+    window.testBidPlayerName = function(){
+        var searchCriteria = getAppMain().getRootViewController().getPresentedViewController().getCurrentViewController().getCurrentController()._viewmodel.searchCriteria;
+        services.Item.searchTransferMarket(searchCriteria, 1).observe(this, (function (sender, response) {
+            if (response.success ) {
+                if (response.data.items.length > 0){
+                    let player = response.data.items[0];
+                    let playerName = window.getItemName(player);;
+                    $(nameBidPlayerNameInput).val(playerName);
+                    writeToDebugLog("|" + playerName + "|");
+                }
+            } else if (!response.success) {
+
+            }
+        }));
+    }
+
+    jQuery(document).on({
+        click: function () {
+            addBidPlayerButtonAction();
+        },
+    }, nameSelectedBidPlayerFilterAddButton);
+
+    window.addBidPlayerButtonAction = function(){
+        var name = jQuery(nameBidPlayerNameInput).val();
+        var bidPriceStrings = jQuery(nameSelectedBidPlayerFilterBidPriceInput).val();
+        var bidPrice = parseInt(bidPriceStrings);
+        var sellPriceStrings = jQuery(nameSelectedBidPlayerFilterSellPriceInput).val();
+        var sellPrice = parseInt(sellPriceStrings);
+
+        let singlePlayer = {"player_name": name,"bidPrice": bidPrice,"sellPrice": sellPrice};
+        window.addBidPlayerInMap(singlePlayer);
+        window.refreshBidPlayerSelector();
+    }
+
+    jQuery(document).on({
+        click: function () {
+            removeBidPlayerButtonAction();
+        },
+    }, nameSelectedBidPlayerFilterRemoveButton);
+
+    window.removeBidPlayerButtonAction = function(){
+        var selectedPlayerName = $('select[name=selectedFiltersBidPlayer] option').filter(':selected').val();
+        window.deleteBidPlayerInMap(selectedPlayerName);
+        window.refreshBidPlayerSelector();
+    }
+
+    window.refreshBidPlayerSelector = function(){
+        let bidPlayerSelector = $(nameSelectedBidPlayerFilter);
+        bidPlayerSelector.empty();
+        for(var item in window.bidPlayerMap){
+            bidPlayerSelector.append($('<option></option>').attr('value', item).text(item));
+        }
+    }
 
     window.toggleBidExact = function () {
         if (window.bidExact) {
@@ -2102,6 +2342,11 @@
                 if ($(nameAbMaxPurchases).val() !== '') {
                     maxPurchases = Math.max(1, parseInt($(nameAbMaxPurchases).val()));
                 }
+                //if set max bid number according to watch list number
+                maxPurchases = Math.min(window.maxNewBidNumber, maxPurchases);
+
+                //calculate max relist
+                window.maxRelistNumber = 100 - response.data.items.length;
                 /**
                 if (window.currentPage <= 20 && response.data.items.length === 21) {
                     window.currentPage++;
@@ -2231,8 +2476,6 @@
                             buyNumber++;
                             maxPurchases--;
                         }
-
-
                         //writeToDebugLog("| " + rating_txt + ' | ' + player_name + ' | ' + bid_txt + ' | ' + buy_txt + ' | ' + expire_time + ' | ' + action_txt);
                         /**
                         buyPlayer(player, checkPrice, sellPrice);
@@ -2475,7 +2718,7 @@
                             return item.getAuctionData().isWon() && !window.userWatchItems.includes(item._auction.tradeId) && !window.sellBids.includes(item._auction.tradeId);
                         });
 
-                        for (var i = 0; i < boughtItems.length; i++) {
+                        for (let i = 0; i < boughtItems.length; i++) {
                             let player = boughtItems[i];
                             let auction = player._auction;
 
@@ -2531,13 +2774,14 @@
                 }
 
                 if (jQuery(nameTelegramBuy).val() == 'B' || jQuery(nameTelegramBuy).val() == 'A') {
-                    window.sendNotificationToUser("| " + player_name.trim() + ' | ' + price_txt.trim() + ' | buy |');
+                    //window.sendNotificationToUser("| " + player_name.trim() + ' | ' + price_txt.trim() + ' | buy |');
                 }
                 window.continousErrorTimes = 0;
                 //writeToLog("window.continousErrorTimes:" + window.continousErrorTimes);
             } else {
                 if (window.continousErrorTimes >=3){
                     writeToLog("end window.continousErrorTimes:" + window.continousErrorTimes);
+                    window.sendNotificationToUser("LuisTheBuyerStop because of multiple Bid Error");
                     window.deactivateAutoBuyer(true);
                 }else{
                     window.continousErrorTimes++;
@@ -2552,7 +2796,7 @@
                 writeToDebugLog(sym + " | " + player_name + ' | ' + price_txt + ' | bid |  ' + expire_time + '  |  failure |' + ' ERR: ' + data.status + '-' + (errorCodeLookUpShort[data.status] || ''));
 
                 if (jQuery(nameTelegramBuy).val() == 'L' || jQuery(nameTelegramBuy).val() == 'A') {
-                    window.sendNotificationToUser("| " + player_name.trim() + ' | ' + price_txt.trim() + ' | failure |');
+                    //window.sendNotificationToUser("| " + player_name.trim() + ' | ' + price_txt.trim() + ' | failure |');
                 }
 
                 if (jQuery(nameAbStopErrorCode).val()) {
@@ -2671,14 +2915,16 @@
                     let player = unsoldItemsLocal[wi];
                     let player_name = window.getItemName(player);
                     //relist expired players
-                    /**
-                    var playerIndex = window.playerNameList.indexOf(player_name);
-                    if (playerIndex > -1){
-                        var playerSellPrice = window.playerSellPriceList[playerIndex];
+
+/**
+                    let playerJSON = window.bidPlayerMap[player_name];
+                    if(playerJSON){
+                        var playerSellPrice = playerJSON.sellPrice;
                         window.relistExpiredPlayers(listNum, player, playerSellPrice);
                         listNum++;
                     }
-                    **/
+**/
+
                 }
                 if (otherUnsold){
                     //services.Item.relistExpiredAuctions().observe(this, function (t, response) {});
