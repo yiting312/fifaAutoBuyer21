@@ -57,20 +57,77 @@
     window.testFunction = function(){
         writeToDebugLog("test function");
 
-        var playerName = "testPlayer";
-        var bidPrice = 100;
-        var sellPrice = 200;
-        let singlePlayerList = {"player_name": playerName,"bidPrice": bidPrice,"sellPrice": sellPrice};
-        window.addBidPlayerInMap(singlePlayerList);
-        /**
-        var bidPlayerMap = {playerName:singlePlayerList};
-        writeToDebugLog(bidPlayerMap);
-        writeToDebugLog(bidPlayerMap.playerName.player_name);
-        **/
 
-        var player = _searchViewModel.playerData;
-        var playerString = JSON.stringify(player);
-        writeToDebugLog("playerString:" + playerString);
+        services.Item.requestWatchedItems().observe(this, function (t, watchResponse) {
+            if (watchResponse.success ) {
+                let outBidItems = watchResponse.data.items.filter(function (item) {
+                    return item._auction._bidState === "outbid" && item._auction._tradeState === "active";
+                });
+                writeToDebugLog("WatchList outbid count:  " + outBidItems.length + "  |   active Count:" + watchResponse.data.items.length);
+                var buyNumber = 1;
+                for (var i = 0; i < outBidItems.length; i++) {
+                    writeToDebugLog("here 0");
+                    let player = outBidItems[i];
+                    let player_name = window.getItemName(player);
+                    let auction = player._auction;
+                    //if undefined player is unbided
+                    let isBid = auction.currentBid;
+                    //item current bid
+                    let currentBid = auction.currentBid || auction.startingBid;
+                    var bidPrice = 1000;
+                    //max bid price
+                    let priceToBid = (isBid) ? window.getSellBidPrice(bidPrice) : bidPrice;
+                    //if player's max bid price is defined in code bid in that money
+                    writeToDebugLog("here 1");
+                    let playerJSON = window.bidPlayerMap[player_name];
+                    if(playerJSON){
+                        var playerBidPrice = playerJSON.bidPrice;
+                        priceToBid = (isBid) ? window.getSellBidPrice(playerBidPrice) : playerBidPrice;
+                    }
+                    writeToDebugLog("here 2");
+                    //this is the bid money
+                    let checkPrice = (window.bidExact) ? bidPrice : ((isBid) ? window.getBuyBidPrice(currentBid) : currentBid);
+                    writeToDebugLog("currentBid:" + currentBid + " priceToBid:" + priceToBid + " checkPrice:" + checkPrice);
+                    /**
+
+                    //if (window.autoBuyerActive && currentBid <= priceToBid && checkPrice <= window.futStatistics.coinsNumber) {
+                    if (window.autoBuyerActive && (currentBid <= priceToBid)) {
+                        if (auction.expires > 30) {
+                            let expires = services.Localization.localizeAuctionTimeRemaining(auction.expires);
+                            let expire_time = window.format_string(expires, 15);
+                            let player_name = window.getItemName(player);
+                            writeToDebugLog("skipRebid  | " + player_name + ' | ' + currentBid + ' | ' + expire_time + '|  ');
+                        }else{
+                            (function (t, playerX, checkPriceX, sellPriceX) {
+                                setTimeout(function () {
+                                    let player_nameX = window.getItemName(playerX);
+                                    writeToDebugLog("bid |  WatchList  |  " + player_nameX + "  |  " + checkPriceX + "  |  " + t);
+                                    buyPlayer(playerX, checkPriceX, sellPriceX);
+                                }, 2000 * t);	// 还是每秒执行一次，不是累加的
+                            })(buyNumber, player, checkPrice, sellPrice);
+                            buyNumber++;
+                        }
+
+                }else{
+                    (function (t, playerX) {
+                        setTimeout(function () {
+                            let player_nameX = window.getItemName(playerX);
+                            let auction = playerX._auction;
+                            let isBid = auction.currentBid;
+                            let currentBid = auction.currentBid || auction.startingBid;
+                            writeToLog("unwatch  |  targetList  |  " + currentBid  + '\(' + priceToBid + '\)' + "  |  " + player_nameX + "  |           |  " + t);
+                            unWatchPlayer(playerX);
+                        }, 1000 * t);
+                    })(1, player);
+                }
+                **/
+                }
+
+            } else if (!watchResponse.success) {
+
+            }
+        });
+
 
 
     }
@@ -469,7 +526,7 @@
                                 priceToBid = (isBid) ? window.getSellBidPrice(playerBidPrice) : playerBidPrice;
                             }
                             //this is the bid money
-                            let checkPrice = (window.bidExact) ? bidPrice : ((isBid) ? window.getBuyBidPrice(currentBid) : currentBid);
+                            let checkPrice = (isBid) ? window.getBuyBidPrice(currentBid) : currentBid;
                             //if (window.autoBuyerActive && currentBid <= priceToBid && checkPrice <= window.futStatistics.coinsNumber) {
                             if (window.autoBuyerActive && (currentBid <= priceToBid)) {
                                 if (auction.expires > 30) {
@@ -619,8 +676,8 @@
     };
 
     window.clearLog = function () {
-        //window.testFunction();
-        //return;
+        window.testFunction();
+        return;
         var $progressLog = jQuery(nameProgressAutobuyer);
         var $buyerLog = jQuery(nameAutoBuyerFoundLog);
         $progressLog.val("");
@@ -2916,7 +2973,7 @@
                     let player_name = window.getItemName(player);
                     //relist expired players
 
-/**
+                    /**
                     let playerJSON = window.bidPlayerMap[player_name];
                     if(playerJSON){
                         var playerSellPrice = playerJSON.sellPrice;
