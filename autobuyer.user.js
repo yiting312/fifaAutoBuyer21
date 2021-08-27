@@ -49,6 +49,7 @@
     window.maxNewBidNumber = 3;
     window.maxRelistNumber = 0;
     window.bidPlayerMap = {};
+    window.toggleRelistSpecificPlayer = false;
 
 
 
@@ -240,7 +241,8 @@
         nameSelectedBidPlayerFilterBidPriceInput = '#elem_' + makeid(15),
         nameSelectedBidPlayerFilterSellPriceInput = '#elem_' + makeid(15),
         nameBidPlayerNameInput = '#elem_' + makeid(15),
-        nameTestBidPlayerNameButton = '#elem_' + makeid(15);
+        nameTestBidPlayerNameButton = '#elem_' + makeid(15),
+        nameRelistSepecificToggle = '#elem_' + makeid(15);
 
     window.loadFilter = function () {
         var filterName = $('select[name=filters] option').filter(':selected').val();
@@ -575,6 +577,7 @@
                         var maxReLiNum = window.maxRelistNumber;
                         for (var wi = 0; wi < wonItems.length; wi++) {
                             if (maxReLiNum < 1){
+                                window.maxRelistNumber = 0;
                                 writeToDebugLog("skip relist because transfer list if full");
                                 return;
                             }
@@ -1492,6 +1495,17 @@
                         '</div>' +
                         '<div class="button-container">' +
                         '    <button class="btn-standard call-to-action" id="' + nameSelectedBidPlayerFilterRemoveButton.substring(1) + '">Remove Bid Player</button>' +
+                        '</div>'+
+                        '<div class="price-filter">' +
+                        '   <div style="padding : 22px" class="ut-toggle-cell-view">' +
+                        '       <span class="ut-toggle-cell-view--label">Relist According Bid List</span>' +
+                        '           <div id="' + nameRelistSepecificToggle.substring(1) + '" class="ut-toggle-control">' +
+                        '           <div class="ut-toggle-control--track">' +
+                        '           </div>' +
+                        '           <div class= "ut-toggle-control--grip" >' +
+                        '           </div>' +
+                        '       </div>' +
+                        '   </div>' +
                         '</div>'
                     );
 
@@ -1789,8 +1803,8 @@
             let bot_chatID = jQuery(nameTelegramChatId).val();
             let message = "Test Notification Arrived";
             if (bot_token && bot_chatID) {
-                let url = 'https://api.telegram.org/bot' + bot_token +
-                    '/sendMessage?chat_id=' + bot_chatID + '&parse_mode=Markdown&text=' + message;
+                let url = 'https://api.telegram.org/bot' + bot_token + '/sendMessage?chat_id=' + bot_chatID + '&parse_mode=Markdown&text=' + message;
+                //let url = 'https://tgproxy-m.herokuapp.com/bot' + bot_token + '/sendMessage?chat_id=' + bot_chatID + '&parse_mode=Markdown&text=' + message;
                 var xhttp = new XMLHttpRequest();
                 xhttp.open("GET", url, true);
                 xhttp.send();
@@ -2015,6 +2029,16 @@
         }
     }
 
+    window.toggleRelistSpecificPlayerFuc = function(){
+        if (window.toggleRelistSpecificPlayer) {
+            window.toggleRelistSpecificPlayer = false;
+            jQuery(nameRelistSepecificToggle).removeClass("toggled");
+        } else {
+            window.toggleRelistSpecificPlayer = true;
+            jQuery(nameRelistSepecificToggle).addClass("toggled");
+        }
+    }
+
 
     jQuery(document).on('click', nameAbBidExact, toggleBidExact);
     jQuery(document).on('click', nameAbSellToggle, toggleRelist);
@@ -2027,6 +2051,7 @@
     jQuery(document).on('click', nameAbSoundToggle, toggleSound);
     jQuery(document).on('click', nameAbMessageNotificationToggle, toggleMessageNotification);
     jQuery(document).on('click', nameAbSolveCaptcha, toggleSolveCaptcha);
+    jQuery(document).on('click', nameRelistSepecificToggle, toggleRelistSpecificPlayerFuc);
 
 
     jQuery(document).on('keyup', nameAbSellPrice, function () {
@@ -2402,8 +2427,7 @@
                 //if set max bid number according to watch list number
                 maxPurchases = Math.min(window.maxNewBidNumber, maxPurchases);
 
-                //calculate max relist
-                window.maxRelistNumber = 100 - response.data.items.length;
+
                 /**
                 if (window.currentPage <= 20 && response.data.items.length === 21) {
                     window.currentPage++;
@@ -2924,6 +2948,8 @@
         writeToDebugLog("updateTransferList");
         sendPinEvents("Transfer List - List View");
         services.Item.requestTransferItems().observe(this, function (t, response) {
+            //calculate max relist
+            window.maxRelistNumber = 100 - response.data.items.length;
             let sendEvent = true;
             let soldItems = response.data.items.filter(function (item) {
                 return item.getAuctionData().isSold();
@@ -2958,7 +2984,6 @@
             **/
             if (window.futStatistics.unsoldItems){
                 var listNum = 1;
-                var otherUnsold = false;
                 writeToDebugLog('------------------------------------------------------------------------------------------');
                 writeToDebugLog('[TRANSFER-LIST] > ' + unsoldItemsLocal.length + " item(s) unsold");
                 writeToDebugLog('------------------------------------------------------------------------------------------');
@@ -2968,25 +2993,21 @@
                 }else{
                     unsoldItemsLengthLimit = unsoldItemsLocal.length;
                 }
-                for (var wi = 0; wi < unsoldItemsLocal.length; wi++) {
-                    let player = unsoldItemsLocal[wi];
-                    let player_name = window.getItemName(player);
-                    //relist expired players
-
-                    /**
-                    let playerJSON = window.bidPlayerMap[player_name];
-                    if(playerJSON){
-                        var playerSellPrice = playerJSON.sellPrice;
-                        window.relistExpiredPlayers(listNum, player, playerSellPrice);
-                        listNum++;
+                if (window.toggleRelistSpecificPlayer){
+                    for (var wi = 0; wi < unsoldItemsLocal.length; wi++) {
+                        let player = unsoldItemsLocal[wi];
+                        let player_name = window.getItemName(player);
+                        //relist expired players
+                        let playerJSON = window.bidPlayerMap[player_name];
+                        if(playerJSON){
+                            var playerSellPrice = playerJSON.sellPrice;
+                            window.relistExpiredPlayers(listNum, player, playerSellPrice);
+                            listNum++;
+                        }
                     }
-**/
-
+                }else{
+                    services.Item.relistExpiredAuctions().observe(this, function (t, response) {});
                 }
-                if (otherUnsold){
-                    //services.Item.relistExpiredAuctions().observe(this, function (t, response) {});
-                }
-                services.Item.relistExpiredAuctions().observe(this, function (t, response) {});
             }
 
             window.futStatistics.activeTransfers = response.data.items.filter(function (item) {
