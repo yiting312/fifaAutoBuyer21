@@ -441,6 +441,7 @@
     }
 
     window.sendNotificationToUser = function (message) {
+        /**
         if (window.notificationEnabled) {
             let bot_token = jQuery(nameTelegramBotToken).val();
             let bot_chatID = jQuery(nameTelegramChatId).val();
@@ -452,7 +453,19 @@
                 xhttp.send();
             }
         }
+        **/
+        if (window.notificationEnabled) {
+            let bot_token = jQuery(nameTelegramBotToken).val();
+            let url = 'https://sctapi.ftqq.com/' + bot_token + '.send?title=testtitle&desp=';
+            var xhttp = new XMLHttpRequest();
+            xhttp.open("GET", url, true);
+            xhttp.send();
+
+        }
     }
+
+    let url = 'https://sctapi.ftqq.com/SCT69934TJXg04WqPhzYInaZEDd0t2wtW.send?title=testtitle&desp=';
+
 
     window.buyTargetFromTheMarket = function(){
 
@@ -679,8 +692,8 @@
     };
 
     window.clearLog = function () {
-        window.testFunction();
-        return;
+        //window.testFunction();
+        //return;
         var $progressLog = jQuery(nameProgressAutobuyer);
         var $buyerLog = jQuery(nameAutoBuyerFoundLog);
         $progressLog.val("");
