@@ -464,9 +464,6 @@
         }
     }
 
-    let url = 'https://sctapi.ftqq.com/SCT69934TJXg04WqPhzYInaZEDd0t2wtW.send?title=testtitle&desp=';
-
-
     window.buyTargetFromTheMarket = function(){
 
     }
