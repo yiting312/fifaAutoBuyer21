@@ -505,6 +505,7 @@
                         let player_nameX = window.getItemName(playerX);
                         let auction = playerX._auction;
                         let isBid = auction.currentBid;
+                        let buyNowPrice = auction.buyNowPrice;
                         let currentBid = auction.currentBid || auction.startingBid;
                         writeToLog("unwatch  |  targetList  |  " + currentBid + "（closed）  |  " + player_nameX + "  |           |  " + t);
                         unWatchPlayer(playerX);
@@ -2269,7 +2270,6 @@
 
             //handle watch list(transfer targe list)
             if (!window.selectedFilters.length && (window.timers.bidCheck.finish == 0 || window.timers.bidCheck.finish <= time)) {
-                //window.watchBidItems();
                 window.refreshBidTargetList();
                 window.timers.bidCheck = window.createTimeout(time, 10000);
             }
@@ -2744,91 +2744,6 @@
         var nearestPrice = Math.round(price / range.inc) * range.inc;
         return Math.max(Math.min(nearestPrice, 14999000), 0);
     }
-
-    window.watchBidItems = function () {
-
-        services.Item.clearTransferMarketCache();
-
-        services.Item.requestWatchedItems().observe(this, function (t, response) {
-
-            var bidPrice = parseInt(jQuery(nameAbMaxBid).val());
-
-            var sellPrice = parseInt(jQuery(nameAbSellPrice).val());
-
-            let activeItems = response.data.items.filter(function (item) {
-                return item._auction && item._auction._tradeState === "active";
-            });
-
-            services.Item.refreshAuctions(activeItems).observe(this, function (t, refreshResponse) {
-                services.Item.requestWatchedItems().observe(this, function (t, watchResponse) {
-                    if (window.autoBuyerActive && bidPrice) {
-
-                        let outBidItems = watchResponse.data.items.filter(function (item) {
-                            return item._auction._bidState === "outbid" && item._auction._tradeState === "active";
-                        });
-
-                        for (var i = 0; i < outBidItems.length; i++) {
-
-                            let player = outBidItems[i];
-                            let auction = player._auction;
-
-                            let isBid = auction.currentBid;
-
-                            let currentBid = auction.currentBid || auction.startingBid;
-
-                            let priceToBid = (window.bidExact) ? bidPrice : ((isBid) ? window.getSellBidPrice(bidPrice) : bidPrice);
-
-                            let checkPrice = (window.bidExact) ? bidPrice : ((isBid) ? window.getBuyBidPrice(currentBid) : currentBid);
-
-                            if (window.autoBuyerActive && currentBid <= priceToBid && checkPrice <= window.futStatistics.coinsNumber) {
-                                //writeToDebugLog('Bidding on outbidded item -> Bidding Price :' + checkPrice);
-                                if (auction.expires > 1800) {
-                                    let expires = services.Localization.localizeAuctionTimeRemaining(auction.expires);
-                                    let expire_time = window.format_string(expires, 15);
-                                    let player_name = window.getItemName(player);
-                                    writeToDebugLog("skipRebid  | " + player_name + ' | ' + currentBid + ' | ' + expire_time + '|  ');
-                                }else{
-                                    buyPlayer(player, checkPrice, sellPrice);
-                                    window.addDelayAfterBuy && window.waitSync(1);
-                                    if (!window.bids.includes(auction.tradeId)) {
-                                        window.bids.push(auction.tradeId);
-
-                                        if (window.bids.length > 300) {
-                                            window.bids.shift();
-                                        }
-                                    }
-                                }
-
-                            }
-                        }
-                    }
-
-                    if (window.autoBuyerActive && sellPrice && !isNaN(sellPrice)) {
-
-                        let boughtItems = response.data.items.filter(function (item) {
-                            return item.getAuctionData().isWon() && !window.userWatchItems.includes(item._auction.tradeId) && !window.sellBids.includes(item._auction.tradeId);
-                        });
-
-                        for (let i = 0; i < boughtItems.length; i++) {
-                            let player = boughtItems[i];
-                            let auction = player._auction;
-
-                            window.sellBids.push(auction.tradeId);
-                            let player_name = window.getItemName(player);
-                            writeToLog(" ($$$) " + player_name + '[' + player._auction.tradeId + '] -- Selling for: ' + sellPrice);
-                            player.clearAuction();
-
-                            window.sellRequestTimeout = window.setTimeout(function () {
-                                services.Item.list(player, window.getSellBidPrice(sellPrice), sellPrice, 3600);
-                            }, window.getRandomWait());
-                        }
-
-                        services.Item.clearTransferMarketCache();
-                    }
-                });
-            });
-        });
-    };
 
     window.buyPlayer = function (player, price, sellPrice, isBin) {
         services.Item.bid(player, price).observe(this, (function (sender, data) {
