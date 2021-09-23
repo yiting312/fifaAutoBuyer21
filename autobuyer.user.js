@@ -1,11 +1,11 @@
 // ==UserScript==
-// @name         FUT 21 Autobuyer Menu with TamperMonkey
+// @name         FUT 22 Autobuyer Menu with TamperMonkey
 // @namespace    http://tampermonkey.net/
-// @version      2.1.0
-// @updateURL    https://raw.githubusercontent.com/chithakumar13/Fifa21-AutoBuyer/master/autobuyer.js
-// @downloadURL  https://raw.githubusercontent.com/chithakumar13/Fifa21-AutoBuyer/master/autobuyer.js
-// @description  FUT Snipping Tool
-// @author       CK Algos
+// @version      22.0.0
+// @updateURL    https://github.com/yiting312/fifaAutoBuyer21/blob/master/autobuyer.user.js
+// @downloadURL  https://github.com/yiting312/fifaAutoBuyer21/blob/master/autobuyer.user.js
+// @description  FUT bid Tool
+// @author       lyt
 // @match        https://www.ea.com/*/fifa/ultimate-team/web-app/*
 // @match        https://www.ea.com/fifa/ultimate-team/web-app/*
 // @grant       GM_xmlhttpRequest
@@ -57,83 +57,7 @@
 
     window.testFunction = function(){
         writeToDebugLog("test function");
-
-
-        services.Item.requestWatchedItems().observe(this, function (t, watchResponse) {
-            if (watchResponse.success ) {
-                let outBidItems = watchResponse.data.items.filter(function (item) {
-                    return item._auction._bidState === "outbid" && item._auction._tradeState === "active";
-                });
-                writeToDebugLog("WatchList outbid count:  " + outBidItems.length + "  |   active Count:" + watchResponse.data.items.length);
-                var buyNumber = 1;
-                for (var i = 0; i < outBidItems.length; i++) {
-                    writeToDebugLog("here 0");
-                    let player = outBidItems[i];
-                    let player_name = window.getItemName(player);
-                    let auction = player._auction;
-                    //if undefined player is unbided
-                    let isBid = auction.currentBid;
-                    //item current bid
-                    let currentBid = auction.currentBid || auction.startingBid;
-                    var bidPrice = 1000;
-                    //max bid price
-                    let priceToBid = (isBid) ? window.getSellBidPrice(bidPrice) : bidPrice;
-                    //if player's max bid price is defined in code bid in that money
-                    writeToDebugLog("here 1");
-                    let playerJSON = window.bidPlayerMap[player_name];
-                    if(playerJSON){
-                        var playerBidPrice = playerJSON.bidPrice;
-                        priceToBid = (isBid) ? window.getSellBidPrice(playerBidPrice) : playerBidPrice;
-                    }
-                    writeToDebugLog("here 2");
-                    //this is the bid money
-                    let checkPrice = (window.bidExact) ? bidPrice : ((isBid) ? window.getBuyBidPrice(currentBid) : currentBid);
-                    writeToDebugLog("currentBid:" + currentBid + " priceToBid:" + priceToBid + " checkPrice:" + checkPrice);
-                    /**
-
-                    //if (window.autoBuyerActive && currentBid <= priceToBid && checkPrice <= window.futStatistics.coinsNumber) {
-                    if (window.autoBuyerActive && (currentBid <= priceToBid)) {
-                        if (auction.expires > 30) {
-                            let expires = services.Localization.localizeAuctionTimeRemaining(auction.expires);
-                            let expire_time = window.format_string(expires, 15);
-                            let player_name = window.getItemName(player);
-                            writeToDebugLog("skipRebid  | " + player_name + ' | ' + currentBid + ' | ' + expire_time + '|  ');
-                        }else{
-                            (function (t, playerX, checkPriceX, sellPriceX) {
-                                setTimeout(function () {
-                                    let player_nameX = window.getItemName(playerX);
-                                    writeToDebugLog("bid |  WatchList  |  " + player_nameX + "  |  " + checkPriceX + "  |  " + t);
-                                    buyPlayer(playerX, checkPriceX, sellPriceX);
-                                }, 2000 * t);	// 还是每秒执行一次，不是累加的
-                            })(buyNumber, player, checkPrice, sellPrice);
-                            buyNumber++;
-                        }
-
-                }else{
-                    (function (t, playerX) {
-                        setTimeout(function () {
-                            let player_nameX = window.getItemName(playerX);
-                            let auction = playerX._auction;
-                            let isBid = auction.currentBid;
-                            let currentBid = auction.currentBid || auction.startingBid;
-                            writeToLog("unwatch  |  targetList  |  " + currentBid  + '\(' + priceToBid + '\)' + "  |  " + player_nameX + "  |           |  " + t);
-                            unWatchPlayer(playerX);
-                        }, 1000 * t);
-                    })(1, player);
-                }
-                **/
-                }
-
-            } else if (!watchResponse.success) {
-
-            }
-        });
-
-
-
     }
-
-
 
     window.addBidPlayerInMap = function(singlePlayer){
         writeToDebugLog("addBidPlayerInMap");
@@ -441,7 +365,6 @@
     }
 
     window.sendNotificationToUser = function (message) {
-        /**
         if (window.notificationEnabled) {
             let bot_token = jQuery(nameTelegramBotToken).val();
             let bot_chatID = jQuery(nameTelegramChatId).val();
@@ -452,15 +375,6 @@
                 xhttp.open("GET", url, true);
                 xhttp.send();
             }
-        }
-        **/
-        if (window.notificationEnabled) {
-            let bot_token = jQuery(nameTelegramBotToken).val();
-            let url = 'https://sctapi.ftqq.com/' + bot_token + '.send?title=testtitle&desp=';
-            var xhttp = new XMLHttpRequest();
-            xhttp.open("GET", url, true);
-            xhttp.send();
-
         }
     }
 
@@ -497,6 +411,7 @@
             let closedOutbidItems = response.data.items.filter(function (item) {
                 return item._auction && item._auction._bidState === "outbid" && item._auction._tradeState === "closed";
             });
+
             var untargetNumber = 1;
             for (var ci = 0; ci < closedOutbidItems.length; ci++){
                 var player = closedOutbidItems[ci];
@@ -505,7 +420,6 @@
                         let player_nameX = window.getItemName(playerX);
                         let auction = playerX._auction;
                         let isBid = auction.currentBid;
-                        let buyNowPrice = auction.buyNowPrice;
                         let currentBid = auction.currentBid || auction.startingBid;
                         writeToLog("unwatch  |  targetList  |  " + currentBid + "（closed）  |  " + player_nameX + "  |           |  " + t);
                         unWatchPlayer(playerX);
@@ -513,6 +427,7 @@
                 })(untargetNumber, player);
                 untargetNumber++;
             }
+
             services.Item.refreshAuctions(activeItems).observe(this, function (t, refreshResponse) {
                 services.Item.requestWatchedItems().observe(this, function (t, watchResponse) {
                     if (window.autoBuyerActive && bidPrice) {
@@ -603,8 +518,6 @@
                                 maxReLiNum--;
                             }
 
-
-
                         }
                     }
                 });
@@ -690,8 +603,8 @@
     };
 
     window.clearLog = function () {
-        //window.testFunction();
-        //return;
+        window.testFunction();
+        return;
         var $progressLog = jQuery(nameProgressAutobuyer);
         var $buyerLog = jQuery(nameAutoBuyerFoundLog);
         $progressLog.val("");
@@ -763,7 +676,7 @@
                 if (s.initWithRootController(new UTHomeHubViewController),
                     o.initWithRootController(new UTSquadsHubViewController),
                     l.initWithRootController(new UTTransfersHubViewController),
-                    u.initWithRootController(new UTStoreViewController),
+                    u.initWithRootController(new UTStoreHubViewController),
                     h.initWithRootController(new UTClubHubViewController),
                     st.initWithRootController(new UTCustomizeHubViewController),
                     p.init(),
@@ -2069,18 +1982,6 @@
         jQuery(nameSellAfterTax).html((jQuery(nameAbSellPrice).val() - ((parseInt(jQuery(nameAbSellPrice).val()) / 100) * 5)).toLocaleString());
     });
 
-    window.updateAutoTransferListStat = function () {
-        if (!window.autoBuyerActive) {
-            return;
-        }
-
-        sendPinEvents("Hub - Transfers");
-
-        setTimeout(function () {
-            window.updateTransferList();
-        }, 300);
-    };
-
     window.writeToLog = function (message) {
         let time_txt = '[' + new Date().toLocaleTimeString() + '] '
         var $log = jQuery(nameProgressAutobuyer);
@@ -2270,6 +2171,7 @@
 
             //handle watch list(transfer targe list)
             if (!window.selectedFilters.length && (window.timers.bidCheck.finish == 0 || window.timers.bidCheck.finish <= time)) {
+                //window.watchBidItems();
                 window.refreshBidTargetList();
                 window.timers.bidCheck = window.createTimeout(time, 10000);
             }
@@ -2744,6 +2646,91 @@
         var nearestPrice = Math.round(price / range.inc) * range.inc;
         return Math.max(Math.min(nearestPrice, 14999000), 0);
     }
+
+    window.watchBidItems = function () {
+
+        services.Item.clearTransferMarketCache();
+
+        services.Item.requestWatchedItems().observe(this, function (t, response) {
+
+            var bidPrice = parseInt(jQuery(nameAbMaxBid).val());
+
+            var sellPrice = parseInt(jQuery(nameAbSellPrice).val());
+
+            let activeItems = response.data.items.filter(function (item) {
+                return item._auction && item._auction._tradeState === "active";
+            });
+
+            services.Item.refreshAuctions(activeItems).observe(this, function (t, refreshResponse) {
+                services.Item.requestWatchedItems().observe(this, function (t, watchResponse) {
+                    if (window.autoBuyerActive && bidPrice) {
+
+                        let outBidItems = watchResponse.data.items.filter(function (item) {
+                            return item._auction._bidState === "outbid" && item._auction._tradeState === "active";
+                        });
+
+                        for (var i = 0; i < outBidItems.length; i++) {
+
+                            let player = outBidItems[i];
+                            let auction = player._auction;
+
+                            let isBid = auction.currentBid;
+
+                            let currentBid = auction.currentBid || auction.startingBid;
+
+                            let priceToBid = (window.bidExact) ? bidPrice : ((isBid) ? window.getSellBidPrice(bidPrice) : bidPrice);
+
+                            let checkPrice = (window.bidExact) ? bidPrice : ((isBid) ? window.getBuyBidPrice(currentBid) : currentBid);
+
+                            if (window.autoBuyerActive && currentBid <= priceToBid && checkPrice <= window.futStatistics.coinsNumber) {
+                                //writeToDebugLog('Bidding on outbidded item -> Bidding Price :' + checkPrice);
+                                if (auction.expires > 1800) {
+                                    let expires = services.Localization.localizeAuctionTimeRemaining(auction.expires);
+                                    let expire_time = window.format_string(expires, 15);
+                                    let player_name = window.getItemName(player);
+                                    writeToDebugLog("skipRebid  | " + player_name + ' | ' + currentBid + ' | ' + expire_time + '|  ');
+                                }else{
+                                    buyPlayer(player, checkPrice, sellPrice);
+                                    window.addDelayAfterBuy && window.waitSync(1);
+                                    if (!window.bids.includes(auction.tradeId)) {
+                                        window.bids.push(auction.tradeId);
+
+                                        if (window.bids.length > 300) {
+                                            window.bids.shift();
+                                        }
+                                    }
+                                }
+
+                            }
+                        }
+                    }
+
+                    if (window.autoBuyerActive && sellPrice && !isNaN(sellPrice)) {
+
+                        let boughtItems = response.data.items.filter(function (item) {
+                            return item.getAuctionData().isWon() && !window.userWatchItems.includes(item._auction.tradeId) && !window.sellBids.includes(item._auction.tradeId);
+                        });
+
+                        for (let i = 0; i < boughtItems.length; i++) {
+                            let player = boughtItems[i];
+                            let auction = player._auction;
+
+                            window.sellBids.push(auction.tradeId);
+                            let player_name = window.getItemName(player);
+                            writeToLog(" ($$$) " + player_name + '[' + player._auction.tradeId + '] -- Selling for: ' + sellPrice);
+                            player.clearAuction();
+
+                            window.sellRequestTimeout = window.setTimeout(function () {
+                                services.Item.list(player, window.getSellBidPrice(sellPrice), sellPrice, 3600);
+                            }, window.getRandomWait());
+                        }
+
+                        services.Item.clearTransferMarketCache();
+                    }
+                });
+            });
+        });
+    };
 
     window.buyPlayer = function (player, price, sellPrice, isBin) {
         services.Item.bid(player, price).observe(this, (function (sender, data) {
