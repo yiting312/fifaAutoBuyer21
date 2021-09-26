@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FUT 22 Autobuyer Menu with TamperMonkey
 // @namespace    http://tampermonkey.net/
-// @version      22.0.0
+// @version      22.0.1
 // @updateURL    https://github.com/yiting312/fifaAutoBuyer21/blob/master/autobuyer.user.js
 // @downloadURL  https://github.com/yiting312/fifaAutoBuyer21/blob/master/autobuyer.user.js
 // @description  FUT bid Tool
@@ -14,6 +14,7 @@
 // @grant       GM_deleteValue
 // @grant       GM_listValues
 // ==/UserScript==
+
 
 (function () {
     'use strict';
@@ -145,6 +146,10 @@
         nameAbRequestCount = '#elem_' + makeid(15),
         nameAbCoins = '#elem_' + makeid(15),
         nameAbStatus = '#elem_' + makeid(15),
+        nameAbHighestBidItems = '#elem_' + makeid(15),
+        nameAbLosingBidItems = '#elem_' + makeid(15),
+        nameAbWatchWonItems = '#elem_' + makeid(15),
+        nameAbAllWatchedItems = '#elem_' + makeid(15),
         nameAbSoldItems = '#elem_' + makeid(15),
         nameAbUnsoldItems = '#elem_' + makeid(15),
         nameAbAvailableItems = '#elem_' + makeid(15),
@@ -162,6 +167,7 @@
         nameSelectedBidPlayerFilter = '#elem_' + makeid(15),
         nameSelectedBidPlayerFilterAddButton = '#elem_' + makeid(15),
         nameSelectedBidPlayerFilterRemoveButton = '#elem_' + makeid(15),
+        nameBidPlayerFilterRelistButton = '#elem_' + makeid(15),
         nameSelectedBidPlayerFilterBidPriceInput = '#elem_' + makeid(15),
         nameSelectedBidPlayerFilterSellPriceInput = '#elem_' + makeid(15),
         nameBidPlayerNameInput = '#elem_' + makeid(15),
@@ -404,7 +410,7 @@
             let activeItems = response.data.items.filter(function (item) {
                 return item._auction && item._auction._tradeState === "active";
             });
-            if (activeItems.length === 0){//if activebid is 0 then buy new items
+            if (activeItems.length === 0 && window.maxNewBidNumber > 0){//if activebid is 0 then buy new items
                 var time = (new Date()).getTime();
                 window.timers.search = window.createTimeout(time, 500);
             }
@@ -435,7 +441,21 @@
                         let outBidItems = watchResponse.data.items.filter(function (item) {
                             return item._auction._bidState === "outbid" && item._auction._tradeState === "active";
                         });
-                        writeToDebugLog("WatchList outbid count:  " + outBidItems.length + "  |   active Count:" + watchResponse.data.items.length);
+                        let wonItems = watchResponse.data.items.filter(function (item) {
+                            return item._auction._bidState === "highest" && item._auction._tradeState === "closed";
+                        });
+                        let bidingItems = watchResponse.data.items.filter(function (item) {
+                            return item._auction && item._auction._tradeState === "active";
+                        });
+                        let highestItems = watchResponse.data.items.filter(function (item) {
+                            return item._auction && item._auction._bidState === "highest" && item._auction._tradeState === "active";
+                        });
+                        jQuery(nameAbHighestBidItems).html(highestItems.length);
+                        jQuery(nameAbLosingBidItems).html(outBidItems.length);
+                        jQuery(nameAbWatchWonItems).html(wonItems.length);
+                        jQuery(nameAbAllWatchedItems).html(watchResponse.data.items.length);
+
+                        writeToDebugLog("WatchList outbid count:  " + outBidItems.length + "  |   active Count:" + bidingItems.length + "  |   won Count:" + wonItems.length);
                         var buyNumber = 1;
                         for (var i = 0; i < outBidItems.length; i++) {
                             let player = outBidItems[i];
@@ -496,9 +516,6 @@
                             }
                         }
                         //list items
-                        let wonItems = watchResponse.data.items.filter(function (item) {
-                            return item._auction._bidState === "highest" && item._auction._tradeState === "closed";
-                        });
                         var listNum = 1;
                         var maxReLiNum = window.maxRelistNumber;
                         for (var wi = 0; wi < wonItems.length; wi++) {
@@ -871,8 +888,8 @@
                     '.ut-content-container .ut-content { max-height: none !important; }' +
                     '</style>' +
                     '<div id="' + nameInfoWrapper.substring(1) + '" class="ut-navigation-bar-view navbar-style-landscape">' +
-                    '   <h1 class="title">AUTOBUYER STATUS: <span id="' + nameAbStatus.substring(1) + '"></span> | REQUEST COUNT: <span id="' + nameAbRequestCount.substring(1) + '">0</span></h1>' +
-                    '   <div class="view-navbar-clubinfo">' +
+                    '   <h1 class="title">AUTOBUYER STATUS: <span id="' + nameAbStatus.substring(1) + '"></span></h1>' +
+                    '   <div class="view-navbar-clubinfo" style="display: none;">' +
                     '       <div class="view-navbar-clubinfo-data">' +
                     '           <div class="view-navbar-clubinfo-name">' +
                     '               <div style="float: left;">Search:</div>' +
@@ -886,6 +903,18 @@
                     '                   <div id="' + nameAbStatisticsProgress.substring(1) + '" style="background: #000; height: 10px; width: 0%"></div>' +
                     '               </div>' +
                     '           </div>' +
+                    '       </div>' +
+                    '   </div>' +
+                    '   <div class="view-navbar-clubinfo">' +
+                    '       <div class="view-navbar-clubinfo-data">' +
+                    '           <span class="view-navbar-clubinfo-name">Highest Bid: <span id="' + nameAbHighestBidItems.substring(1) + '"></span></span>' +
+                    '           <span class="view-navbar-clubinfo-name">Losing Bid: <span id="' + nameAbLosingBidItems.substring(1) + '"></span></span>' +
+                    '       </div>' +
+                    '   </div>' +
+                    '   <div class="view-navbar-clubinfo">' +
+                    '       <div class="view-navbar-clubinfo-data">' +
+                    '           <span class="view-navbar-clubinfo-name">Won Item: <span id="' + nameAbWatchWonItems.substring(1) + '"></span></span>' +
+                    '           <span class="view-navbar-clubinfo-name">All Watched: <span id="' + nameAbAllWatchedItems.substring(1) + '"></span></span>' +
                     '       </div>' +
                     '   </div>' +
                     '   <div class="view-navbar-currency" style="margin-left: 10px;">' +
@@ -941,7 +970,7 @@
                         '   <h1 class="secondary">Buy/Bid Settings:</h1>' +
                         '</div>' +
                         '<div><br></div>' +
-                        '<div class="price-filter">' +
+                        '<div class="price-filter" style="display: none;">' +
                         '   <div class="info">' +
                         '       <span class="secondary label">Buy Price:</span>' +
                         '   </div>' +
@@ -951,7 +980,7 @@
                         '       </div>' +
                         '   </div>' +
                         '</div>' +
-                        '<div class="price-filter">' +
+                        '<div class="price-filter" style="display: none;">' +
                         '   <div class="info">' +
                         '       <span class="secondary label">No. of cards to buy:<br/><small>(Works only with Buy price)</small>:</span>' +
                         '   </div>' +
@@ -971,7 +1000,7 @@
                         '       </div>' +
                         '   </div>' +
                         '</div>' +
-                        '<div class="price-filter">' +
+                        '<div class="price-filter" style="display: none;">' +
                         '   <div style="padding : 22px" class="ut-toggle-cell-view">' +
                         '       <span class="ut-toggle-cell-view--label">Bid Exact Price</span>' +
                         '           <div id="' + nameAbBidExact.substring(1) + '" class="ut-toggle-control">' +
@@ -992,18 +1021,18 @@
                         '       </div>' +
                         '   </div>' +
                         '</div>' +
-                        '<div class="price-filter">' +
+                        '<div class="price-filter" style="display: none;">' +
                         '<div class="button-container">' +
                         '    <button class="btn-standard call-to-action" id="' + nameCalcBinPrice.substring(1) + '">Calculate Buy Price</button>' +
                         '</div>' +
                         '</div>' +
                         '<div><br></div>' +
                         '<hr>' +
-                        '<div class="search-price-header">' +
+                        '<div class="search-price-header" style="display: none;">' +
                         '   <h1 class="secondary">Sell settings:</h1>' +
                         '</div>' +
                         '<div><br></div>' +
-                        '<div class="price-filter">' +
+                        '<div class="price-filter" style="display: none;">' +
                         '   <div class="info">' +
                         '       <span class="secondary label">Sell Price:</span><br/><small>Receive After Tax: <span id="' + nameSellAfterTax.substring(1) + '">0</span></small>' +
                         '   </div>' +
@@ -1013,7 +1042,7 @@
                         '       </div>' +
                         '   </div>' +
                         '</div>' +
-                        '<div class="price-filter">' +
+                        '<div class="price-filter" style="display: none;">' +
                         '   <div class="info">' +
                         '       <span class="secondary label">Clear sold count:<br/><small>(Clear sold items when reach a specified count)</small>:</span>' +
                         '   </div>' +
@@ -1023,7 +1052,7 @@
                         '       </div>' +
                         '   </div>' +
                         '</div>' +
-                        '<div style="padding-top : 20px" class="ut-toggle-cell-view">' +
+                        '<div style="padding-top : 20px;display: none;" class="ut-toggle-cell-view" >' +
                         '    <span class="ut-toggle-cell-view--label">Relist Unsold Items</span>' +
                         '    <div id="' + nameAbSellToggle.substring(1) + '" class="ut-toggle-control">' +
                         '        <div class="ut-toggle-control--track">' +
@@ -1032,13 +1061,13 @@
                         '        </div>' +
                         '    </div>' +
                         '</div>' +
-                        '<div><br></div>' +
-                        '<hr>' +
+                        '<div style="display: none;"><br></div>' +
+                        '<hr style="display: none;">' +
                         '<div class="search-price-header">' +
                         '   <h1 class="secondary">Safety settings:</h1>' +
                         '</div>' +
                         '<div><br></div>' +
-                        '<div class="price-filter">' +
+                        '<div class="price-filter" style="display: none;">' +
                         '   <div class="info">' +
                         '       <span class="secondary label">Wait Time:<br/><small>(Random second range eg. 7-15)</small>:</span>' +
                         '   </div>' +
@@ -1058,7 +1087,7 @@
                         '       </div>' +
                         '   </div>' +
                         '</div>' +
-                        '<div class="price-filter">' +
+                        '<div class="price-filter" style="display: none;">' +
                         '   <div class="info">' +
                         '       <span class="secondary label">Pause Cycle :<br/><small>(Number of searches performed before triggerring Pause)</small>:</span>' +
                         '   </div>' +
@@ -1068,7 +1097,7 @@
                         '       </div>' +
                         '   </div>' +
                         '</div>' +
-                        '<div class="price-filter">' +
+                        '<div class="price-filter" style="display: none;">' +
                         '   <div class="info">' +
                         '       <span class="secondary label">Pause For:<br/><small>(S for seconds, M for Minutes, H for hours eg. 0-0S)</small>:</span>' +
                         '   </div>' +
@@ -1088,7 +1117,7 @@
                         '       </div>' +
                         '   </div>' +
                         '</div>' +
-                        '<div class="price-filter">' +
+                        '<div class="price-filter" style="display: none;">' +
                         '   <div style="padding : 22px" class="ut-toggle-cell-view">' +
                         '       <span class="ut-toggle-cell-view--label">Add Delay After Buy<br/><small>(Adds 1 Sec Delay after trying <br/> to buy / bid a card)</small></span>' +
                         '           <div id="' + nameAbAddBuyDelay.substring(1) + '" class="ut-toggle-control">' +
@@ -1099,7 +1128,7 @@
                         '       </div>' +
                         '   </div>' +
                         '</div>' +
-                        '<div class="price-filter">' +
+                        '<div class="price-filter" style="display: none;">' +
                         '   <div style="padding : 22px" class="ut-toggle-cell-view">' +
                         '       <span class="ut-toggle-cell-view--label">SKIP GK<br/><small>(Skip all goalkeepers <br/> to buy / bid a card)</small></span>' +
                         '           <div id="' + nameAbAddFilterGK.substring(1) + '" class="ut-toggle-control">' +
@@ -1138,11 +1167,11 @@
                         '</div>' +
                         '<div><br></div>' +
                         '<hr>' +
-                        '<div class="search-price-header">' +
+                        '<div class="search-price-header" style="display: none;">' +
                         '   <h1 class="secondary">Search settings:</h1>' +
                         '</div>' +
                         '<div><br></div>' +
-                        '<div class="price-filter">' +
+                        '<div class="price-filter" style="display: none;">' +
                         '   <div class="info">' +
                         '       <span class="secondary label">Max value of random min bid:</span>' +
                         '   </div>' +
@@ -1152,7 +1181,7 @@
                         '       </div>' +
                         '   </div>' +
                         '</div>' +
-                        '<div class="price-filter">' +
+                        '<div class="price-filter" style="display: none;">' +
                         '   <div style="padding : 22px" class="ut-toggle-cell-view">' +
                         '       <span class="ut-toggle-cell-view--label">Use random min bid</span>' +
                         '           <div id="' + nameAbRandMinBidToggle.substring(1) + '" class="ut-toggle-control">' +
@@ -1163,7 +1192,7 @@
                         '       </div>' +
                         '   </div>' +
                         '</div>' +
-                        '<div class="price-filter">' +
+                        '<div class="price-filter" style="display: none;">' +
                         '   <div class="info">' +
                         '       <span class="secondary label">Max value of random min buy:</span>' +
                         '   </div>' +
@@ -1173,7 +1202,7 @@
                         '       </div>' +
                         '   </div>' +
                         '</div>' +
-                        '<div class="price-filter">' +
+                        '<div class="price-filter" style="display: none;">' +
                         '   <div style="padding : 22px" class="ut-toggle-cell-view">' +
                         '       <span class="ut-toggle-cell-view--label">Use random min buy</span>' +
                         '           <div id="' + nameAbRandMinBuyToggle.substring(1) + '" class="ut-toggle-control">' +
@@ -1184,8 +1213,8 @@
                         '       </div>' +
                         '   </div>' +
                         '</div>' +
-                        '<div><br></div>' +
-                        '<hr>' +
+                        '<div style="display: none;"><br></div>' +
+                        '<hr  style="display: none;">' +
                         '<div class="search-price-header">' +
                         '   <h1 class="secondary">Captcha settings:</h1>' +
                         '</div>' +
@@ -1325,14 +1354,14 @@
                         '    <button class="btn-standard call-to-action" id="' + nameTestNotification.substring(1) + '">Test Notification</button>' +
                         '</div>' +
                         '<div><br></div>' +
-                        '<div class="search-price-header">' +
+                        '<div class="search-price-header" style="display: none;">' +
                         '   <h1 class="secondary">Multi-Filter settings:</h1>' +
                         '</div>' +
-                        '<div class="button-container">' +
+                        '<div class="button-container" style="display: none;">' +
                         '       <select multiple="multiple" class="multiselect-filter" id="' + nameSelectedFilter.substring(1) + '" name="selectedFilters" style="padding: 10px;width: 100%;font-family: UltimateTeamCondensed,sans-serif;font-size: 1.6em;color: #e2dde2;text-transform: uppercase;background-color: #171826; overflow-y : scroll"></select>' +
                         '       <label style="white-space: nowrap;" id="' + nameSelectFilterCount.substring(1) + '">No Filter Selected</label>' +
                         '</div>' +
-                        '<div class="price-filter">' +
+                        '<div class="price-filter" style="display: none;">' +
                         '   <div class="info">' +
                         '       <span class="secondary label">Number of search For Filter:<br/><small>Count of searches to be performed before switching to different filter</small></span>' +
                         '   </div>' +
@@ -1368,6 +1397,7 @@
                         '  Your browser does not support the audio element.\n' +
                         '</audio>' +
                         '<div><br></div>' +
+                        '<hr>' +
                         '<div class="search-price-header">' +
                         '   <h1 class="secondary">Rebid Settings:</h1>' +
                         '</div>' +
@@ -1430,6 +1460,9 @@
                         '           </div>' +
                         '       </div>' +
                         '   </div>' +
+                        '</div>' +
+                        '<div class="button-container">' +
+                        '    <button class="btn-standard call-to-action" id="' + nameBidPlayerFilterRelistButton.substring(1) + '">Relist By this List Onece</button>' +
                         '</div>'
                     );
 
@@ -1842,6 +1875,37 @@
         window.refreshBidPlayerSelector();
     }
 
+    jQuery(document).on({
+        click: function () {
+            relistAccordingToBidPlayerList();
+        },
+    }, nameBidPlayerFilterRelistButton);
+
+    window.relistAccordingToBidPlayerList = function(){
+        services.Item.requestTransferItems().observe(this, function (t, response) {
+            window.futStatistics.unsoldItems = response.data.items.filter(function (item) {
+                return !item.getAuctionData().isSold() && item.getAuctionData().isExpired();
+            }).length;
+            let unsoldItemsLocal = response.data.items.filter(function (item) {
+                return !item.getAuctionData().isSold() && item.getAuctionData().isExpired();
+            });
+            if (window.futStatistics.unsoldItems){
+                var listNum = 1;
+                for (var wi = 0; wi < unsoldItemsLocal.length; wi++) {
+                    let player = unsoldItemsLocal[wi];
+                    let player_name = window.getItemName(player);
+                    //relist expired players
+                    let playerJSON = window.bidPlayerMap[player_name];
+                    if(playerJSON){
+                        var playerSellPrice = playerJSON.sellPrice;
+                        window.relistExpiredPlayers(listNum, player, playerSellPrice);
+                        listNum++;
+                    }
+                }
+            }
+        });
+    }
+
     window.refreshBidPlayerSelector = function(){
         let bidPlayerSelector = $(nameSelectedBidPlayerFilter);
         bidPlayerSelector.empty();
@@ -2035,7 +2099,7 @@
         jQuery(nameAbSearchProgress).css('width', window.getTimerProgress(window.timers.search));
         jQuery(nameAbStatisticsProgress).css('width', window.getTimerProgress(window.timers.transferList));
 
-        jQuery(nameAbRequestCount).html(window.searchCount);
+        //jQuery(nameAbRequestCount).html(window.searchCount);
 
         jQuery(nameAbCoins).html(window.futStatistics.coins);
 
@@ -2118,7 +2182,7 @@
         };
 
         window.timers = {
-            search: window.createTimeout(0, 0),
+            search: window.createTimeout((new Date()).getTime(), 600000),
             coins: window.createTimeout(0, 0),
             transferList: window.createTimeout(0, 0),
             bidCheck: window.createTimeout(0, 0)
@@ -2171,7 +2235,6 @@
 
             //handle watch list(transfer targe list)
             if (!window.selectedFilters.length && (window.timers.bidCheck.finish == 0 || window.timers.bidCheck.finish <= time)) {
-                //window.watchBidItems();
                 window.refreshBidTargetList();
                 window.timers.bidCheck = window.createTimeout(time, 10000);
             }
@@ -2647,91 +2710,6 @@
         return Math.max(Math.min(nearestPrice, 14999000), 0);
     }
 
-    window.watchBidItems = function () {
-
-        services.Item.clearTransferMarketCache();
-
-        services.Item.requestWatchedItems().observe(this, function (t, response) {
-
-            var bidPrice = parseInt(jQuery(nameAbMaxBid).val());
-
-            var sellPrice = parseInt(jQuery(nameAbSellPrice).val());
-
-            let activeItems = response.data.items.filter(function (item) {
-                return item._auction && item._auction._tradeState === "active";
-            });
-
-            services.Item.refreshAuctions(activeItems).observe(this, function (t, refreshResponse) {
-                services.Item.requestWatchedItems().observe(this, function (t, watchResponse) {
-                    if (window.autoBuyerActive && bidPrice) {
-
-                        let outBidItems = watchResponse.data.items.filter(function (item) {
-                            return item._auction._bidState === "outbid" && item._auction._tradeState === "active";
-                        });
-
-                        for (var i = 0; i < outBidItems.length; i++) {
-
-                            let player = outBidItems[i];
-                            let auction = player._auction;
-
-                            let isBid = auction.currentBid;
-
-                            let currentBid = auction.currentBid || auction.startingBid;
-
-                            let priceToBid = (window.bidExact) ? bidPrice : ((isBid) ? window.getSellBidPrice(bidPrice) : bidPrice);
-
-                            let checkPrice = (window.bidExact) ? bidPrice : ((isBid) ? window.getBuyBidPrice(currentBid) : currentBid);
-
-                            if (window.autoBuyerActive && currentBid <= priceToBid && checkPrice <= window.futStatistics.coinsNumber) {
-                                //writeToDebugLog('Bidding on outbidded item -> Bidding Price :' + checkPrice);
-                                if (auction.expires > 1800) {
-                                    let expires = services.Localization.localizeAuctionTimeRemaining(auction.expires);
-                                    let expire_time = window.format_string(expires, 15);
-                                    let player_name = window.getItemName(player);
-                                    writeToDebugLog("skipRebid  | " + player_name + ' | ' + currentBid + ' | ' + expire_time + '|  ');
-                                }else{
-                                    buyPlayer(player, checkPrice, sellPrice);
-                                    window.addDelayAfterBuy && window.waitSync(1);
-                                    if (!window.bids.includes(auction.tradeId)) {
-                                        window.bids.push(auction.tradeId);
-
-                                        if (window.bids.length > 300) {
-                                            window.bids.shift();
-                                        }
-                                    }
-                                }
-
-                            }
-                        }
-                    }
-
-                    if (window.autoBuyerActive && sellPrice && !isNaN(sellPrice)) {
-
-                        let boughtItems = response.data.items.filter(function (item) {
-                            return item.getAuctionData().isWon() && !window.userWatchItems.includes(item._auction.tradeId) && !window.sellBids.includes(item._auction.tradeId);
-                        });
-
-                        for (let i = 0; i < boughtItems.length; i++) {
-                            let player = boughtItems[i];
-                            let auction = player._auction;
-
-                            window.sellBids.push(auction.tradeId);
-                            let player_name = window.getItemName(player);
-                            writeToLog(" ($$$) " + player_name + '[' + player._auction.tradeId + '] -- Selling for: ' + sellPrice);
-                            player.clearAuction();
-
-                            window.sellRequestTimeout = window.setTimeout(function () {
-                                services.Item.list(player, window.getSellBidPrice(sellPrice), sellPrice, 3600);
-                            }, window.getRandomWait());
-                        }
-
-                        services.Item.clearTransferMarketCache();
-                    }
-                });
-            });
-        });
-    };
-
     window.buyPlayer = function (player, price, sellPrice, isBin) {
         services.Item.bid(player, price).observe(this, (function (sender, data) {
             let price_txt = window.format_string(price.toString(), 6)
@@ -3002,3 +2980,4 @@
         });
     }
 })();
+
