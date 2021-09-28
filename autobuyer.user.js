@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FUT 22 Autobuyer Menu with TamperMonkey
 // @namespace    http://tampermonkey.net/
-// @version      22.0.1
+// @version      22.0.2
 // @updateURL    https://github.com/yiting312/fifaAutoBuyer21/blob/master/autobuyer.user.js
 // @downloadURL  https://github.com/yiting312/fifaAutoBuyer21/blob/master/autobuyer.user.js
 // @description  FUT bid Tool
@@ -14,7 +14,6 @@
 // @grant       GM_deleteValue
 // @grant       GM_listValues
 // ==/UserScript==
-
 
 (function () {
     'use strict';
@@ -56,8 +55,104 @@
 
     var _searchViewModel = null;
 
+    window.getScriptProfitMoney = function(){
+        window.scriptProfitMoney = GM_getValue("scriptProfitMoney");
+        if (!window.scriptProfitMoney){
+            window.scriptProfitMoney = 0;
+        }
+    }
+
+    window.saveScriptProfitMoney = function(){
+        GM_setValue("scriptProfitMoney", window.scriptProfitMoney);
+    }
+
+    window.addProfitBids = function(singleBidPlayer){
+        writeToDebugLog("addProfitBids");
+        let singleBidPlayerString = JSON.stringify(singleBidPlayer);
+        writeToDebugLog("addProfitBids:" + singleBidPlayerString);
+        //playerBidMap
+        window.getProfitBids();
+        window.profitBids[singleBidPlayer.id] = singleBidPlayer;
+        let profitBidsString = JSON.stringify(window.profitBids);
+        writeToDebugLog("profitBidsString:" + profitBidsString);
+
+        GM_setValue("profitBids", JSON.stringify(window.profitBids));
+    }
+
+    window.deleteProfitBids = function(id){
+        //playerBidMap
+        window.getProfitBids();
+        delete window.profitBids[id];
+        GM_setValue("profitBids", JSON.stringify(window.profitBids));
+    }
+
+    window.getProfitBids = function(){
+        var profitBidsString = GM_getValue("profitBids");
+        writeToDebugLog("tempJsonString:" + profitBidsString);
+        if (!profitBidsString) {
+            return;
+        }
+        window.profitBids = JSON.parse(profitBidsString);
+    }
+
+    window.getProfitDate = function(){
+        var profitDateString = GM_getValue("profitDate");
+        if (!profitDateString){
+            window.resetProfitDate();
+        }else{
+            window.profitDate = profitDateString;
+        }
+    }
+
+    window.resetProfitDate = function(){
+        var date = new Date();
+        var profitDateString = date.toLocaleDateString() + date.toLocaleTimeString();
+        window.profitDate = profitDateString;
+        GM_setValue("profitDate", profitDateString);
+    }
+
     window.testFunction = function(){
         writeToDebugLog("test function");
+
+        services.Item.requestTransferItems().observe(this, function (t, response) {
+            //calculate max relist
+            let soldItems = response.data.items.filter(function (item) {
+                return item.getAuctionData().isSold();
+            });
+
+            window.getScriptProfitMoney();
+            window.getProfitBids();
+            for (var i = 0; i < soldItems.length; i++) {
+                let player = soldItems[i];
+                let id = player.id;
+                let sellPrice = player._auction.currentBid;
+                let playerFromMap = window.profitBids[id];
+                if (playerFromMap){
+                    let buyPrice = playerFromMap.bought_price;
+                    let profit = sellPrice * 0.95 - buyPrice;
+                    window.scriptProfitMoney = window.scriptProfitMoney + profit;
+                    window.deleteProfitBids(id);
+                }else{
+                    writeToLog("no Player");
+                }
+            }
+            jQuery(nameAbScriptProfitItems).html(window.scriptProfitMoney);//get profit total
+            window.saveScriptProfitMoney();
+
+
+            var minSoldCount = 0;//clear soldItems anyway
+            /**
+            if (window.futStatistics.soldItems > minSoldCount) {
+                writeToDebugLog('------------------------------------------------------------------------------------------');
+                writeToDebugLog('[TRANSFER-LIST] > ' + window.futStatistics.soldItems + " item(s) sold");
+                writeToDebugLog('------------------------------------------------------------------------------------------');
+                window.clearSoldItems(soldItems);
+            }
+            */
+        });
+
+
+
     }
 
     window.addBidPlayerInMap = function(singlePlayer){
@@ -146,6 +241,9 @@
         nameAbRequestCount = '#elem_' + makeid(15),
         nameAbCoins = '#elem_' + makeid(15),
         nameAbStatus = '#elem_' + makeid(15),
+        nameAbScriptProfitItems = '#elem_' + makeid(15),
+        nameAbScriptProfitDateItems = '#elem_' + makeid(15),
+        nameResetAnaylseButton = '#elem_' + makeid(15),
         nameAbHighestBidItems = '#elem_' + makeid(15),
         nameAbLosingBidItems = '#elem_' + makeid(15),
         nameAbWatchWonItems = '#elem_' + makeid(15),
@@ -168,6 +266,9 @@
         nameSelectedBidPlayerFilterAddButton = '#elem_' + makeid(15),
         nameSelectedBidPlayerFilterRemoveButton = '#elem_' + makeid(15),
         nameBidPlayerFilterRelistButton = '#elem_' + makeid(15),
+        nameRelistNoChangeButton = '#elem_' + makeid(15),
+        nameSellToBuyRatioInput = '#elem_' + makeid(15),
+        nameRelistSellToBuyRatioButton = '#elem_' + makeid(15),
         nameSelectedBidPlayerFilterBidPriceInput = '#elem_' + makeid(15),
         nameSelectedBidPlayerFilterSellPriceInput = '#elem_' + makeid(15),
         nameBidPlayerNameInput = '#elem_' + makeid(15),
@@ -395,6 +496,9 @@
             let currentBid = auction.currentBid || auction.startingBid;
             writeToLog("list  |  targetList  |  " + currentBid + "  |  " + player_nameX + "  |  " + sellPriceX + "  |  " + t);
             services.Item.list(playerX, window.getSellBidPrice(sellPriceX), sellPriceX, 3600);
+            //add script player in profit map
+            let transferPlayer = {"player_name": player_nameX,"bought_price": playerX._auction.currentBid,"id":playerX.id};
+            window.addProfitBids(transferPlayer);
         }, 1000 * t);
     }
 
@@ -453,7 +557,7 @@
                         jQuery(nameAbHighestBidItems).html(highestItems.length);
                         jQuery(nameAbLosingBidItems).html(outBidItems.length);
                         jQuery(nameAbWatchWonItems).html(wonItems.length);
-                        jQuery(nameAbAllWatchedItems).html(watchResponse.data.items.length);
+                        jQuery(nameAbAllWatchedItems).html(bidingItems.length);
 
                         writeToDebugLog("WatchList outbid count:  " + outBidItems.length + "  |   active Count:" + bidingItems.length + "  |   won Count:" + wonItems.length);
                         var buyNumber = 1;
@@ -907,6 +1011,12 @@
                     '   </div>' +
                     '   <div class="view-navbar-clubinfo">' +
                     '       <div class="view-navbar-clubinfo-data">' +
+                    '           <span class="view-navbar-clubinfo-name">Script Profit: <span id="' + nameAbScriptProfitItems.substring(1) + '"></span></span>' +
+                    '           <span class="view-navbar-clubinfo-name">Profit StartDate: <span id="' + nameAbScriptProfitDateItems.substring(1) + '"></span></span>' +
+                    '       </div>' +
+                    '   </div>' +
+                    '   <div class="view-navbar-clubinfo">' +
+                    '       <div class="view-navbar-clubinfo-data">' +
                     '           <span class="view-navbar-clubinfo-name">Highest Bid: <span id="' + nameAbHighestBidItems.substring(1) + '"></span></span>' +
                     '           <span class="view-navbar-clubinfo-name">Losing Bid: <span id="' + nameAbLosingBidItems.substring(1) + '"></span></span>' +
                     '       </div>' +
@@ -914,7 +1024,7 @@
                     '   <div class="view-navbar-clubinfo">' +
                     '       <div class="view-navbar-clubinfo-data">' +
                     '           <span class="view-navbar-clubinfo-name">Won Item: <span id="' + nameAbWatchWonItems.substring(1) + '"></span></span>' +
-                    '           <span class="view-navbar-clubinfo-name">All Watched: <span id="' + nameAbAllWatchedItems.substring(1) + '"></span></span>' +
+                    '           <span class="view-navbar-clubinfo-name">Active Item: <span id="' + nameAbAllWatchedItems.substring(1) + '"></span></span>' +
                     '       </div>' +
                     '   </div>' +
                     '   <div class="view-navbar-currency" style="margin-left: 10px;">' +
@@ -1461,8 +1571,40 @@
                         '       </div>' +
                         '   </div>' +
                         '</div>' +
+                        '<div class="search-price-header">' +
+                        '   <h1 class="secondary">List Player Frome Transfer List(Once):</h1>' +
+                        '</div>' +
                         '<div class="button-container">' +
-                        '    <button class="btn-standard call-to-action" id="' + nameBidPlayerFilterRelistButton.substring(1) + '">Relist By this List Onece</button>' +
+                        '    <button class="btn-standard call-to-action" id="' + nameBidPlayerFilterRelistButton.substring(1) + '">Relist By this List Once</button>' +
+                        '</div>' +
+                        '<div class="button-container">' +
+                        '    <button class="btn-standard call-to-action" id="' + nameRelistNoChangeButton.substring(1) + '">Relist Without Change Once</button>' +
+                        '</div>' +
+                        '<div class="price-filter">' +
+                        '   <div class="info">' +
+                        '       <span class="secondary label">Sell/BuyIn Ratio(e.g. 1.1 is 110%)</span>' +
+                        '   </div>' +
+                        '   <div class="buttonInfo">' +
+                        '       <div class="inputBox">' +
+                        '           <input type="text" class="numericInput" id="' + nameSellToBuyRatioInput.substring(1) + '" style="text-transform: none;">' +
+                        '       </div>' +
+                        '   </div>' +
+                        '</div>' +
+                        '<div class="price-filter">' +
+                        '   <div class="info">' +
+                        '       <span class="secondary label">  </span>' +
+                        '   </div>' +
+                        '   <div class="buttonInfo">' +
+                        '       <div class="inputBox">' +
+                        '           <button class="btn-standard call-to-action" id="' + nameRelistSellToBuyRatioButton.substring(1) + '">Relist With the Ratio</button>' +
+                        '       </div>' +
+                        '   </div>' +
+                        '</div>' +
+                        '<div class="search-price-header">' +
+                        '   <h1 class="secondary">Profit anaylse:</h1>' +
+                        '</div>' +
+                        '<div class="button-container">' +
+                        '    <button class="btn-standard call-to-action" id="' + nameResetAnaylseButton.substring(1) + '">Reset Anaylse Button</button>' +
                         '</div>'
                     );
 
@@ -1906,6 +2048,98 @@
         });
     }
 
+    jQuery(document).on({
+        click: function () {
+            relistWithOutChange();
+        },
+    }, nameRelistNoChangeButton);
+
+    window.relistWithOutChange = function(){
+        services.Item.requestTransferItems().observe(this, function (t, response) {
+            window.futStatistics.unsoldItems = response.data.items.filter(function (item) {
+                return !item.getAuctionData().isSold() && item.getAuctionData().isExpired();
+            }).length;
+            let unsoldItemsLocal = response.data.items.filter(function (item) {
+                return !item.getAuctionData().isSold() && item.getAuctionData().isExpired();
+            });
+            if (window.futStatistics.unsoldItems){
+                var listNum = 1;
+                for (var wi = 0; wi < unsoldItemsLocal.length; wi++) {
+                    let player = unsoldItemsLocal[wi];
+                    let player_name = window.getItemName(player);
+                    var playerSellPrice = player._auction.buyNowPrice;
+                    window.relistExpiredPlayers(listNum, player, playerSellPrice);
+                    listNum++;
+                }
+            }
+        });
+    }
+
+    jQuery(document).on({
+        click: function () {
+            resetProfitMoneyAndDate();
+        },
+    }, nameResetAnaylseButton);
+
+    window.resetProfitMoneyAndDate = function(){
+        window.resetProfitDate();
+        window.scriptProfitMoney = 0;
+        window.saveScriptProfitMoney();
+    }
+
+    jQuery(document).on({
+        click: function () {
+            relistWithRatio();
+        },
+    }, nameRelistSellToBuyRatioButton);
+
+    window.relistWithRatio = function(){
+        services.Item.requestTransferItems().observe(this, function (t, response) {
+            window.futStatistics.unsoldItems = response.data.items.filter(function (item) {
+                return !item.getAuctionData().isSold() && item.getAuctionData().isExpired();
+            }).length;
+            let unsoldItemsLocal = response.data.items.filter(function (item) {
+                return !item.getAuctionData().isSold() && item.getAuctionData().isExpired();
+            });
+            if (window.futStatistics.unsoldItems){
+                let ratio = 0;
+                if (jQuery(nameSellToBuyRatioInput).val() !== '') {
+                    ratio = parseFloat(jQuery(nameSellToBuyRatioInput).val());
+                }else{
+                    writeToLog("ratio not set");
+                    return;
+                }
+                var listNum = 1;
+                for (var wi = 0; wi < unsoldItemsLocal.length; wi++) {
+                    let player = unsoldItemsLocal[wi];
+                    let player_name = window.getItemName(player);
+                    let buyPrice = parseFloat(player.lastSalePrice);
+                    if (buyPrice === 0){
+                        writeToLog("buyInPrice is 0");
+                    }else{
+                        let ideaSellPrice = ratio * buyPrice;
+                        let finalSellPrice = 0.0;
+                        if (ideaSellPrice < 1000) {
+                            finalSellPrice = Math.ceil(ideaSellPrice/50)*50;
+                        }else if (ideaSellPrice >= 1000 && ideaSellPrice < 10000) {
+                            finalSellPrice = Math.ceil(ideaSellPrice/100)*100;
+                        }else if (ideaSellPrice >= 10000 && ideaSellPrice < 50000) {
+                            finalSellPrice = Math.ceil(ideaSellPrice/250)*250;
+                        }else if (ideaSellPrice >= 50000 && ideaSellPrice < 100000) {
+                            finalSellPrice = Math.ceil(ideaSellPrice/500)*500;
+                        }else{
+                            finalSellPrice = Math.ceil(ideaSellPrice/1000)*1000;
+                        }
+                        var playerSellPrice = finalSellPrice;
+                        writeToLog(playerSellPrice);
+                        window.relistExpiredPlayers(listNum, player, playerSellPrice);
+                        listNum++;
+                    }
+                }
+            }
+        });
+    }
+
     window.refreshBidPlayerSelector = function(){
         let bidPlayerSelector = $(nameSelectedBidPlayerFilter);
         bidPlayerSelector.empty();
@@ -2191,6 +2425,10 @@
 
     window.bids = [];
     window.sellBids = [];
+    window.profitBids = {};
+    window.scriptProfitMoney = 0;
+    window.profitDate = "";
+
 
     window.createTimeout = function (time, interval) {
         return {
@@ -2917,6 +3155,28 @@
                 sendPinEvents("Item - Detail View");
                 sendEvent = false;
             }
+            //refreshDate
+            window.getProfitDate();
+            //get profitBids
+            window.getScriptProfitMoney();
+            window.getProfitBids();
+            for (var i = 0; i < soldItems.length; i++) {
+                let player = soldItems[i];
+                let id = player.id;
+                let sellPrice = player._auction.currentBid;
+                let playerFromMap = window.profitBids[id];
+                if (playerFromMap){
+                    let buyPrice = playerFromMap.bought_price;
+                    let profit = sellPrice * 0.95 - buyPrice;
+                    window.scriptProfitMoney = window.scriptProfitMoney + profit;
+                    window.deleteProfitBids(id);
+                }else{
+                    writeToLog("no Player");
+                }
+            }
+            jQuery(nameAbScriptProfitItems).html(window.scriptProfitMoney);//get profit total
+            jQuery(nameAbScriptProfitDateItems).html(window.profitDate);//get profit start date
+            window.saveScriptProfitMoney();
 
             var minSoldCount = 10;
             if ($(nameAbMinDeleteCount).val() !== '') {
@@ -2927,7 +3187,7 @@
                 writeToDebugLog('------------------------------------------------------------------------------------------');
                 writeToDebugLog('[TRANSFER-LIST] > ' + window.futStatistics.soldItems + " item(s) sold");
                 writeToDebugLog('------------------------------------------------------------------------------------------');
-                window.clearSoldItems(clearSoldItems);
+                window.clearSoldItems(soldItems);
             }
             sendPinEvents("Hub - Transfers");
         });
@@ -2961,7 +3221,7 @@
             if (response.success){
                 writeToDebugLog("unwatch success");
                 //refresh clear sor
-                services.Item.refreshAuctions(soldItems).observe(this, function (t, refreshResponse) {});
+                services.Item.refreshAuctions([player]).observe(this, function (t, refreshResponse) {});
             }else{
                 writeToDebugLog("unwatch fail");
             }
@@ -2980,4 +3240,3 @@
         });
     }
 })();
-
