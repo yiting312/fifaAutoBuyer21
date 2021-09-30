@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FUT 22 Autobuyer Menu with TamperMonkey
 // @namespace    http://tampermonkey.net/
-// @version      22.0.2
+// @version      22.0.3
 // @updateURL    https://github.com/yiting312/fifaAutoBuyer21/blob/master/autobuyer.user.js
 // @downloadURL  https://github.com/yiting312/fifaAutoBuyer21/blob/master/autobuyer.user.js
 // @description  FUT bid Tool
@@ -49,6 +49,7 @@
     window.maxNewBidNumber = 3;
     window.maxRelistNumber = 0;
     window.bidPlayerMap = {};
+    window.togglePercentList = false;
     window.toggleRelistSpecificPlayer = false;
 
 
@@ -273,6 +274,7 @@
         nameSelectedBidPlayerFilterSellPriceInput = '#elem_' + makeid(15),
         nameBidPlayerNameInput = '#elem_' + makeid(15),
         nameTestBidPlayerNameButton = '#elem_' + makeid(15),
+        nameListPercentToggle = '#elem_' + makeid(15),
         nameRelistSepecificToggle = '#elem_' + makeid(15);
 
     window.loadFilter = function () {
@@ -634,6 +636,32 @@
                             let playerJSON = window.bidPlayerMap[player_name];
                             if(playerJSON){
                                 var playerSellPrice = playerJSON.sellPrice;
+                                if (window.togglePercentList){
+                                    //sell for percentage price
+                                    let ratio = 0;
+                                    let buyPrice = player._auction.currentBid;
+                                    if (jQuery(nameSellToBuyRatioInput).val() !== '' || buyPrice !== 0) {
+                                        ratio = parseFloat(jQuery(nameSellToBuyRatioInput).val());
+                                        let ideaSellPrice = ratio * buyPrice;
+                                        let finalSellPrice = 0.0;
+                                        if (ideaSellPrice < 1000) {
+                                            finalSellPrice = Math.ceil(ideaSellPrice/50)*50;
+                                        }else if (ideaSellPrice >= 1000 && ideaSellPrice < 10000) {
+                                            finalSellPrice = Math.ceil(ideaSellPrice/100)*100;
+                                        }else if (ideaSellPrice >= 10000 && ideaSellPrice < 50000) {
+                                            finalSellPrice = Math.ceil(ideaSellPrice/250)*250;
+                                        }else if (ideaSellPrice >= 50000 && ideaSellPrice < 100000) {
+                                            finalSellPrice = Math.ceil(ideaSellPrice/500)*500;
+                                        }else{
+                                            finalSellPrice = Math.ceil(ideaSellPrice/1000)*1000;
+                                        }
+                                        if (playerSellPrice > finalSellPrice){
+                                            playerSellPrice = finalSellPrice;
+                                        }
+                                    }else{
+                                        writeToLog("ratio not set or buy price is 0");
+                                    }
+                                }
                                 window.listPlayerFromWatchList(listNum, player, playerSellPrice);
                                 listNum++;
                                 maxReLiNum--;
@@ -1600,6 +1628,17 @@
                         '       </div>' +
                         '   </div>' +
                         '</div>' +
+                        '<div class="price-filter">' +
+                        '   <div style="padding : 22px" class="ut-toggle-cell-view">' +
+                        '       <span class="ut-toggle-cell-view--label">Percent List</span>' +
+                        '           <div id="' + nameListPercentToggle.substring(1) + '" class="ut-toggle-control">' +
+                        '           <div class="ut-toggle-control--track">' +
+                        '           </div>' +
+                        '           <div class= "ut-toggle-control--grip" >' +
+                        '           </div>' +
+                        '       </div>' +
+                        '   </div>' +
+                        '</div>' +
                         '<div class="search-price-header">' +
                         '   <h1 class="secondary">Profit anaylse:</h1>' +
                         '</div>' +
@@ -2251,6 +2290,16 @@
         }
     }
 
+    window.togglePercentListFuc = function(){
+        if (window.togglePercentList) {
+            window.togglePercentList = false;
+            jQuery(nameListPercentToggle).removeClass("toggled");
+        } else {
+            window.togglePercentList = true;
+            jQuery(nameListPercentToggle).addClass("toggled");
+        }
+    }
+
     window.toggleRelistSpecificPlayerFuc = function(){
         if (window.toggleRelistSpecificPlayer) {
             window.toggleRelistSpecificPlayer = false;
@@ -2274,6 +2323,7 @@
     jQuery(document).on('click', nameAbMessageNotificationToggle, toggleMessageNotification);
     jQuery(document).on('click', nameAbSolveCaptcha, toggleSolveCaptcha);
     jQuery(document).on('click', nameRelistSepecificToggle, toggleRelistSpecificPlayerFuc);
+    jQuery(document).on('click', nameListPercentToggle, togglePercentListFuc);
 
 
     jQuery(document).on('keyup', nameAbSellPrice, function () {
